@@ -1,1 +1,2 @@
 from .gaussian import Gaussian
+from .funnel import Funnel

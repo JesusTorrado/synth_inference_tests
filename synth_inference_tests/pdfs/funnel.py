@@ -1,0 +1,48 @@
+"""
+"Correlated funnel" pdf in arbitrary dimensions from https://arxiv.org/abs/2002.06212
+(via https://arxiv.org/abs/2306.16923).
+
+From https://arxiv.org/abs/2306.16923:
+
+> This likelihood problem is challenging because at theta_1 < 0 the posterior covers a
+> small volume with high likelihood and whereas it covers a large volume with low
+> likelihood for theta_1 > 0. This leads to large auto-correlation times for MCMC samplers
+> (Karamanis & Beutler 2020). Similarly, this problem presents a challenge for NS
+> algorithms with region sampling since the proposal volume likely misses parts of the
+> low-theta_1 iso-likelihood surface due to the large volume differences along the first
+> dimension.
+
+"""
+
+from warnings import warn
+
+import numpy as np
+from scipy.stats import norm, multivariate_normal
+
+from ..pdf import PDF
+
+
+class Funnel(PDF):
+    """
+    Correlated funnel from https://arxiv.org/abs/2002.06212
+    """
+
+    dim = None
+    multimodal = False
+    nongaussian = True
+
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+        if dim == 1:
+            warn("A correlated funnel with dim=1 is simply a standard normal")
+        self.bounds = np.array(dim * [[-10, 10]])
+        self.rv_1 = norm(loc=0, scale=1)
+        self.mean_rest = np.zeros(dim - 1)
+        self.corr_rest = np.full(shape=(dim - 1, dim - 1), fill_value=0.95)
+        np.fill_diagonal(self.corr_rest, 1)
+
+    def logp(self, *params):
+        cov = np.exp(params[0]) * self.corr_rest
+        return (self.dim * np.log(20) + self.rv_1.logpdf(params[0]) +
+                multivariate_normal.logpdf(params[1:], mean=self.mean_rest, cov=cov))

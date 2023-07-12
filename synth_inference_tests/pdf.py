@@ -37,6 +37,6 @@ class PDF():
     def logpdf(self, *params):
         self.n += 1
         start = time.time()
-        logp = self.logp(params)
+        logp = self.logp(*params)
         self.t += time.time() - start
         return logp

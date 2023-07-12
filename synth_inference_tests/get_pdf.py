@@ -37,6 +37,8 @@ def get_pdf(name, dim=None, tags=None):
     if dim_from_name:
         dim = int(dim_from_name)
     pdf_class = import_pdf(pdfname)
+    if pdf_class is None:
+        raise ValueError(f"pdf '{name}' not recognized.")
     # Check if it takes dimensionality
     if dim and not pdf_class.can_be_dim(dim):
         raise ValueError(f"pdf '{pdfname}' cannot have dimensionality {dim}.")
