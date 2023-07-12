@@ -1,0 +1,24 @@
+# Backups
+*~
+\#*
+.\#*
+
+# OS-specific
+.directory
+
+# Python, Jupyter and packaging
+*.pyc
+*.egg-info/
+build/
+dist/
+__pycache__
+.ipynb_checkpoints
+
+# Documentation
+docs/_*
+
+# Tests and examples
+.cache
+.pytest_cache
+.coverage*
+examples/output
