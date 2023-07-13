@@ -75,6 +75,6 @@ if __name__ == "__main__":
         raise ValueError("Pass likelihood name as first arg, e.g. 'gaussian5'")
     pdf_name = sys.argv[1]
     pdf = get_pdf(pdf_name)
-    output_folder = os.path.join("output", pdf_name)
+    output_folder = os.path.join("output_cobaya", pdf_name)
     test_run(pdf, cobaya_run_func, process_cobaya_output_func,
              output_folder=output_folder)

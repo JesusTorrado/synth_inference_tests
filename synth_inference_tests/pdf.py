@@ -3,9 +3,10 @@ How to define pdf classes:
 
 
 Dimensionality:
-  - if dimensionality can be taken as arg, __init__ should have `dim` arg, and set it as
-    an attribute called "dim". It can have a class attribute called `dim_min` to define
-    the minimum dimensionality for which the PDF can be defined.
+  - if dimensionality can be taken as arg, __init__ should have `dim` arg, and pass it
+    when calling the parent class (PDF) `__init__()` (see below). It can have a class
+    attribute called `dim_min` to define the minimum dimensionality for which the PDF can
+    be defined (it will be tested automatically).
   - if fixed, it must have a class attribute ``dim`` assigned to the dimensionality.
 
 Custom methods:
@@ -25,7 +26,12 @@ from .mpi import is_main_process
 
 class PDF():
 
-    def __init__(self):
+    def __init__(self, dim=None):
+        if dim is not None:
+            if not self.can_be_dim(dim):
+                raise ValueError(
+                    f"Cannot be defined for dimension smaller than {self.dim_min}.")
+            self.dim = dim
         self.n = 0
         self.t = 0
 

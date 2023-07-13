@@ -24,8 +24,7 @@ class Gaussian(PDF):
 
     def __init__(self, dim, seed=None, prior_size_in_std=_prior_size_in_std,
                  random_mean_in_std=_default_random_mean_in_std):
-        super().__init__()
-        self.dim = dim
+        super().__init__(dim)
         self.prior_size_in_std = prior_size_in_std
         self.random_mean_in_std = random_mean_in_std
         self.draw()

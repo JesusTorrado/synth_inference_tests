@@ -33,10 +33,7 @@ class Funnel(PDF):
     nongaussian = True
 
     def __init__(self, dim):
-        super().__init__()
-        self.dim = dim
-        if dim == 1:
-            warn("A correlated funnel with dim=1 is simply a standard normal")
+        super().__init__(dim)
         self.bounds = np.array(dim * [[-10, 10]])
         self.rv_1 = norm(loc=0, scale=1)
         self.mean_rest = np.zeros(dim - 1)
