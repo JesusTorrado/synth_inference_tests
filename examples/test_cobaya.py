@@ -16,7 +16,7 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     ----------
 
     loglikelihood: callable
-    
+
     bounds : list of boundaries as (lower,upper)
 
     paramnames : list of parameter names, optional
@@ -52,9 +52,10 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     return info
 
 
-def get_cobaya_run_func(logpdf, bounds, output_folder=None):
+def cobaya_run_func(logpdf, bounds, output_folder=None):
     input_dict = cobaya_model_input(logpdf, bounds, paramnames=None)
-    input_dict["sampler"] = {"mcmc": None}
+#    input_dict["sampler"] = {"mcmc": {"measure_speeds": False}}
+    input_dict["sampler"] = {"polychord": {"measure_speeds": False}}
     if not output_folder.endswith(r"\\"):
         output_folder = output_folder + "/"
     input_dict["output"] = output_folder
@@ -75,5 +76,5 @@ if __name__ == "__main__":
     pdf_name = sys.argv[1]
     pdf = get_pdf(pdf_name)
     output_folder = os.path.join("output", pdf_name)
-    test_run(pdf, get_cobaya_run_func, process_cobaya_output_func,
+    test_run(pdf, cobaya_run_func, process_cobaya_output_func,
              output_folder=output_folder)

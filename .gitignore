@@ -21,4 +21,4 @@ docs/_*
 .cache
 .pytest_cache
 .coverage*
-examples/output
+examples/output*/

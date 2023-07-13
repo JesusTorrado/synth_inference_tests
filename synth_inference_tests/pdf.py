@@ -20,8 +20,6 @@ Custom methods:
 import inspect
 import time
 
-import numpy as np
-
 from .mpi import is_main_process
 
 
@@ -39,7 +37,7 @@ class PDF():
             return dim_as_attr == dim
         __init__has_dim_arg = "dim" in set(inspect.signature(cls.__init__).parameters)
         if __init__has_dim_arg:
-            dim_min = getattr(cls, "dim_min", np.inf)
+            dim_min = getattr(cls, "dim_min", 0)
             return dim >= dim_min
         return False
 

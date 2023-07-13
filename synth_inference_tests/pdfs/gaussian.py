@@ -58,3 +58,8 @@ class Gaussian(PDF):
 
     def logp(self, *params):
         return self.rv.logpdf(params)
+
+    def samples(self, n=None):
+        if n is None:
+            n = 100000  # seems to work OK for dim <= 20
+        return self.rv.rvs(n)

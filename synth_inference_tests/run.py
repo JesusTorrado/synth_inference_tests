@@ -68,7 +68,7 @@ def plot_triangle(sample, output_folder, pdf=None):
     filled = [True]
     labels = ["This run"]
     if pdf is not None:
-        truth_sample = pdf.sample(10000)
+        truth_sample = pdf.samples()
         if truth_sample is not None:
             from getdist.mcsamples import MCSamples
             truth_sample = MCSamples(samples=truth_sample, names=sampled_paramnames)
