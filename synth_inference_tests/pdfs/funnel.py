@@ -28,6 +28,7 @@ class Funnel(PDF):
     """
 
     dim = None
+    dim_min = 2
     multimodal = False
     nongaussian = True
 
@@ -46,3 +47,19 @@ class Funnel(PDF):
         cov = np.exp(params[0]) * self.corr_rest
         return (self.dim * np.log(20) + self.rv_1.logpdf(params[0]) +
                 multivariate_normal.logpdf(params[1:], mean=self.mean_rest, cov=cov))
+
+    def samples(self, n=None):
+        if n is None:
+            n = 100000  # seems to work OK for dim <= 20
+        sample = np.full(shape=(n, self.dim), fill_value=np.nan)
+        sample[:, 0] = self.rv_1.rvs(n)
+        # Trick: remove exp(x_1) factor by transforming back to Norm(0, corr_rest),
+        #        and then multiply. Easier to vectorize.
+        corr_samples = multivariate_normal.rvs(
+            size=n, mean=self.mean_rest, cov=self.corr_rest)
+        transf_factor = np.exp(0.5 * sample[:, 0])
+        if self.dim == 2:
+            sample[:, 1] = corr_samples * transf_factor
+        else:
+            sample[:, 1:] = np.multiply(corr_samples, transf_factor[:, np.newaxis])
+        return sample

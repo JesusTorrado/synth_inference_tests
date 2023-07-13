@@ -55,12 +55,27 @@ def run(pdf, run_func, process_output_func, output_folder):
     
     # Plots
     if is_main_process:
-        plot_triangle(sample_results["samples"], output_folder=plots_folder)
+        plot_triangle(sample_results["samples"], pdf=pdf, output_folder=plots_folder)
 
 
-def plot_triangle(sample, output_folder):
+def plot_triangle(sample, output_folder, pdf=None):
     from getdist import plots as gdplt
     g = gdplt.get_subplot_plotter()
-    g.triangle_plot([sample], filled=True)
+    paraminfos = sample.getParamNames().names
+    sampled_paramnames = [p.name for p in paraminfos if not p.isDerived]
+    paramnames = sampled_paramnames + ["chi2"]
+    to_plot = [sample]
+    filled = [True]
+    labels = ["This run"]
+    if pdf is not None:
+        truth_sample = pdf.sample(10000)
+        if truth_sample is not None:
+            from getdist.mcsamples import MCSamples
+            truth_sample = MCSamples(samples=truth_sample, names=sampled_paramnames)
+            to_plot += [truth_sample]
+            filled += [False]
+            labels += ["Truth"]
+    g.triangle_plot(to_plot, params=paramnames, filled=filled,
+                    legend_labels=labels)
     g.export(os.path.join(output_folder, "triangle.png"))
 
