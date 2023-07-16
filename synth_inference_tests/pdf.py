@@ -54,7 +54,7 @@ class PDF():
         self.t += time.time() - start
         return logp
 
-    def samples(self, n):
+    def samples(self, n=None):
         return None
 
     def triangle_plot(self, n=None, filename=None):
