@@ -7,7 +7,7 @@ from gpry.run import Runner
 from synth_inference_tests.get_pdf import get_pdf
 from synth_inference_tests.run import run as test_run
 
-finite_minus_inf = -1e16  # cannot be too small, or pyVBMC crashes
+finite_minus_inf = -1e8  # cannot be too small, or pyVBMC crashes
 
 
 def pyvbmc_run_func(logpdf, bounds, output_folder=None):
