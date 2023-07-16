@@ -67,6 +67,7 @@ def plot_triangle(sample, output_folder, pdf=None):
     to_plot = [sample]
     filled = [True]
     labels = ["This run"]
+    colors = ["blue"]
     if pdf is not None:
         truth_sample = pdf.samples()
         if truth_sample is not None:
@@ -75,7 +76,8 @@ def plot_triangle(sample, output_folder, pdf=None):
             to_plot += [truth_sample]
             filled += [False]
             labels += ["Truth"]
+            colors += ["k"]
     g.triangle_plot(to_plot, params=paramnames, filled=filled,
-                    legend_labels=labels)
+                    legend_labels=labels, contour_colors=colors)
     g.export(os.path.join(output_folder, "triangle.png"))
 
