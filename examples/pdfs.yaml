@@ -5,25 +5,25 @@ Gaussian4:
 Rosenbrock2:
 Funnel2:
 GaussianMix2:
-LogGamma2:
+LogGammaMix2:
 
 Gaussian5:
 Gaussian6:
 Rosenbrock3:
 Funnel3:
 GaussianMix3:
-LogGamma3:
+LogGammaMix3:
 
 Gaussian7:
 Gaussian8:
 Rosenbrock4:
 Funnel4:
 GaussianMix4:
-LogGamma4:
+LogGammaMix4:
 
 Gaussian9:
 Gaussian10:
 Rosenbrock5:
 Funnel5:
 GaussianMix5:
-LogGamma5:
+LogGammaMix5:
