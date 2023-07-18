@@ -35,6 +35,9 @@ class PDF():
         self.n = 0
         self.t = 0
 
+    @property
+    def NameDim(self):
+        return self.__class__.__name__ + str(self.dim)
 
     @classmethod
     def can_be_dim(cls, dim):

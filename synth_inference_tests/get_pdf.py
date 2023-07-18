@@ -2,8 +2,9 @@
 Builds the pdf database and retrieves one or more pdf's based on some dimensionality and tag requirements.
 """
 
-import importlib
+import os
 from inspect import isclass
+import yaml
 
 import synth_inference_tests.pdfs as pdfs
 
@@ -47,3 +48,18 @@ def get_pdf(name, dim=None, tags=None):
         pdf_args["dim"] = dim
     pdf = pdf_class(**pdf_args)
     return pdf
+
+
+def get_pdfs(pdf_or_file_name):
+    """
+    Retrieves pdfs from an input yaml file (as keys).
+    """
+    if os.path.splitext(pdf_or_file_name)[1]:
+        try:
+            with open(pdf_or_file_name, "r") as f:
+                pdfs_dict = yaml.safe_load(f)
+        except FileNotFoundError as excpt:
+            raise FileNotFoundError(f"PDFs file {pdf_or_file_name} not found.") from excpt
+        return [get_pdf(pdf_name) for pdf_name in pdfs_dict]
+    else:  # is pdf name
+        return [get_pdf(pdf_or_file_name)]
