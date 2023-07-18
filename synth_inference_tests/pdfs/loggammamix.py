@@ -26,7 +26,7 @@ def logp_loggamma(x, alpha, mu, sigma):
         alpha * (x - mu) / sigma - np.exp((x - mu) / sigma))
 
 
-class LogGamma(PDF):
+class LogGammaMix(PDF):
     """
     Multimodal LogGamma-Normal distribution from https://arxiv.org/abs/1304.7808, with
     default parameter values as in https://arxiv.org/abs/1407.5459
