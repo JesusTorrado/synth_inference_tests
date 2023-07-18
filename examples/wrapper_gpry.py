@@ -41,10 +41,24 @@ def run_func(logpdf, bounds, output_folder=None,
     from cobaya.model import get_model
 
     kwargs = {}
+    acquisition = None
+
+    from gpry.preprocessing import Normalize_bounds
+    from gpry.gp_acquisition import NORA, GPAcquisition
+    acquisition = NORA(
+        bounds, acq_func="LogExp",
+        preprocessing_X=Normalize_bounds(bounds),
+        mc_every=2 * len(bounds),
+        zeta_scaling=0.85, verbose=3)
+    kwargs = {"gp_acquisition": acquisition}
+
     # GPry cannot take 0/None/False budget
     if not bool(budget):
         budget = 10000000
     kwargs["options"] = {"max_total": budget}
+
+    kwargs["options"].update({"max_initial": 50000,
+                              })
     try:
         runner = Runner(get_model(model_input), checkpoint=output_folder,
                         load_checkpoint="overwrite", plots=False, **kwargs)
