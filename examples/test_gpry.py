@@ -32,20 +32,37 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     return info
 
 
-def gpry_run_func(logpdf, bounds, output_folder=None):
+def gpry_run_func(logpdf, bounds, output_folder=None,
+                  budget=None, budget_count_inf=False, budget_count_parallel=False):
     # TODO: [logpdf, bounds] cannot be passed to GPRY at the moment if logpdf has unnamed
     #       args. Use the same model generator as in the cobaya test.
     model_input = cobaya_model_input(logpdf, bounds)
     from cobaya.model import get_model
-    runner = Runner(get_model(model_input), checkpoint=output_folder,
-                    load_checkpoint="overwrite", plots=False)
-    runner.run()
+
+    kwargs = {}
+    # GPry cannot take 0/None/False budget
+    if not bool(budget):
+        budget = 10000000
+    kwargs["max_total"] = budget
+    try:
+        runner = Runner(get_model(model_input), checkpoint=output_folder,
+                        load_checkpoint="overwrite", plots=False, **kwargs)
+        runner.run()
+    except Exception as excpt:
+        end_state = "e"
+        return "e", None, None
     # Generating MC sample considered part of the process:
     upd_input, sampler = runner.generate_mc_sample(sampler="polychord")
-    return runner, upd_input, sampler
+    if runner.has_converged:
+        end_state = "c"
+    elif runner.n_total_left == 0:
+        end_state = "b"
+    else:
+        end_state = "?"  # will fail later
+    return end_state, runner, upd_input, sampler
 
 def process_gpry_output_func(gpry_return_values, output_folder=None):
-    runner, upd_input, sampler = gpry_return_values
+    _, runner, upd_input, sampler = gpry_return_values
     # Do some GPry plots too
     runner.plot_progress()
     runner.plot_mc(upd_input, sampler, add_training=True)
@@ -61,4 +78,5 @@ if __name__ == "__main__":
     pdf = get_pdf(pdf_name)
     output_folder = os.path.join("output_gpry", pdf_name)
     test_run(pdf, gpry_run_func, process_gpry_output_func,
-             output_folder=output_folder)
+             output_folder=output_folder, budget=None, budget_count_inf=False,
+             budget_count_parallel=False)

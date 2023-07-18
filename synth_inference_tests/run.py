@@ -10,7 +10,8 @@ from .mpi import is_main_process, multiple_processes, mpi_comm, mpi_size, get_nu
 result_file = "result.yaml"
 
 
-def run(pdf, run_func, process_output_func, output_folder):
+def run(pdf, run_func, process_output_func, output_folder,
+        budget=None, budget_count_inf=False, budget_count_parallel=False):
     """
     run_func: callable
         Must take as arguments [logpdf function, bounds], and return ......
@@ -34,7 +35,9 @@ def run(pdf, run_func, process_output_func, output_folder):
         }
     # Run external sampler
     start_total = time()
-    return_values = run_func(pdf.logpdf, pdf.bounds, output_folder=products_folder)
+    return_values = run_func(pdf.logpdf, pdf.bounds, output_folder=products_folder,
+                             budget=None, budget_count_inf=False,
+                             budget_count_parallel=False)
     delta_total = time() - start_total
     # Timings and # evals
     time_pdf = mpi_comm.gather(pdf.t)
@@ -46,16 +49,37 @@ def run(pdf, run_func, process_output_func, output_folder):
             "n_truth": max(n_evals_pdf),
             "time_overhead": max(time_overhead),
         })
+    try:
+        end_state = return_values[0]
+        assert isinstance(end_state, str) and end_state.lower() in ["c", "b", "e"]
+    except (IndexError, AssertionError) as excpt:
+        raise ValueError("The first return value for the 'run' function must be the end "
+                         "state, in particular one of 'c' (converged), 'b' "
+                         "(budget exhausted), 'e' (errored). Got {ending_state}.")
+    result["end_state"] = end_state.lower()
+    if end_state == 'e':
+        dump_result(result, output_folder)
+        return
+
     # Compute/process necessary quantities for the report
-    sample_results = process_output_func(return_values, output_folder=products_folder)
+    sample_results = process_output_func(
+        return_values, output_folder=products_folder)
 
     # Save results object
     with open(os.path.join(output_folder, result_file), "w") as f:
         yaml.dump(result, f)
-    
+
+    # Save results object
+    dump_result(result, output_folder)
+
     # Plots
     if is_main_process:
         plot_triangle(sample_results["samples"], pdf=pdf, output_folder=plots_folder)
+
+
+def dump_result(result, output_folder):
+    with open(os.path.join(output_folder, result_file), "w") as f:
+        yaml.dump(result, f)
 
 
 def plot_triangle(sample, output_folder, pdf=None):
