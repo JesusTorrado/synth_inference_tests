@@ -35,9 +35,9 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
             "If paramnames given, it must have as many parameters as the dimensionality "
             f"specified with 'bounds': {dim}.")
     info = {"params": {p: {"prior": list(b)} for p, b in zip(paramnames, bounds)}}
-    
+
     # NB: `logp` methods in this package have unnamed args, which Cobaya does not support.
-    # We need to create a wrapper with named args.    
+    # We need to create a wrapper with named args.
     def lkl(**kwargs):
         return loglikelihood(*list(kwargs.values()))
 
@@ -48,11 +48,12 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
 
     # info["timing"] = True
     # info["debug"] = True
-    
+
     return info
 
 
-def cobaya_run_func(logpdf, bounds, output_folder=None):
+def cobaya_run_func(logpdf, bounds, output_folder=None,
+                    budget=None, budget_count_inf=False, budget_count_parallel=False):
     input_dict = cobaya_model_input(logpdf, bounds, paramnames=None)
 #    input_dict["sampler"] = {"mcmc": {"measure_speeds": False}}
     input_dict["sampler"] = {"polychord": {"measure_speeds": False}}
@@ -60,12 +61,21 @@ def cobaya_run_func(logpdf, bounds, output_folder=None):
         output_folder = output_folder + "/"
     input_dict["output"] = output_folder
     input_dict["force"] = True
-    return cobaya_run(input_dict)
+    try:
+        upd_input, sampler = cobaya_run(input_dict)
+    except Exception:
+        return "e", None, None
+
+    # TODO: for now budget not managed
+    end_state = "c"
+
+    return end_state, upd_input, sampler
+
 
 
 def process_cobaya_output_func(cobaya_return_values, output_folder=None):
-    upd_input, sampler = cobaya_return_values
     return {"samples": sampler.samples(to_getdist=True, combined=True, skip_samples=0.33)}
+    _, upd_input, sampler = cobaya_return_values
 
 
 

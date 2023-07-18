@@ -49,7 +49,6 @@ def gpry_run_func(logpdf, bounds, output_folder=None,
                         load_checkpoint="overwrite", plots=False, **kwargs)
         runner.run()
     except Exception as excpt:
-        end_state = "e"
         return "e", None, None
     # Generating MC sample considered part of the process:
     upd_input, sampler = runner.generate_mc_sample(sampler="polychord")

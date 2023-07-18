@@ -1,5 +1,6 @@
 import os
 import sys
+from warnings import warn
 import numpy as np
 
 from gpry.run import Runner
@@ -10,21 +11,40 @@ from synth_inference_tests.run import run as test_run
 finite_minus_inf = -1e8  # cannot be too small, or pyVBMC crashes
 
 
-def pyvbmc_run_func(logpdf, bounds, output_folder=None):
+def pyvbmc_run_func(logpdf, bounds, output_folder=None,
+                    budget=None, budget_count_inf=False, budget_count_parallel=False):
     from pyvbmc import VBMC
     LB, UB = bounds.T
     x0 = LB + (UB - LB) / 2
+    options = {}
+    if not bool(budget):
+        budget = 10000000
+    options["max_fun_evals"] = budget
     # pyVBMC calls logpdf funcs with a single arg, can cannot manage -inf
     logpdf_single_arg = lambda X: max(logpdf(*X), finite_minus_inf)
-    vbmc = VBMC(logpdf_single_arg, x0, LB, UB, None, None)
-    vp, results = vbmc.optimize()
+    try:
+        vbmc = VBMC(logpdf_single_arg, x0, LB, UB, None, None, options=options)
+        vp, results = vbmc.optimize()
+    except Exception as excpt:
+        end_state = "e"
+        return "e", None, None, None, None, None
     print("VBMC done!")
+    if results["func_count"] >= budget:
+        end_state = "b"
+        # TODO: fix this!
+        if results["func_count"] > budget:
+            warn(f"More lopposterior evaluations ({results['func_count']}) "
+                 f"than budgeted ({budget}).")
+    elif results["convergence_status"].lower() == "probable":
+        end_state = "c"
+    else:
+        end_state = "?"
     Xs, _ = vp.sample(10000)
     print("VBMC sampled!")
-    return vp, results, Xs, logpdf
+    return end_state, vp, results, Xs, logpdf
 
 def process_pyvbmc_output_func(pyvbmc_return_values, output_folder=None):
-    vp, results, Xs, logpdf = pyvbmc_return_values
+    _, vp, results, Xs, logpdf = pyvbmc_return_values
     from getdist.mcsamples import MCSamples
     gdsample = MCSamples(samples=Xs, names=[f"x_{i+1}" for i in range(vp.D)])
     chi2s = -2 * np.array([logpdf(*x) for x in Xs])
