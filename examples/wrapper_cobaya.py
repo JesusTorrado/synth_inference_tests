@@ -52,7 +52,7 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     return info
 
 
-def cobaya_run_func(logpdf, bounds, output_folder=None,
+def run_func(logpdf, bounds, output_folder=None,
                     budget=None, budget_count_inf=False, budget_count_parallel=False):
     input_dict = cobaya_model_input(logpdf, bounds, paramnames=None)
 #    input_dict["sampler"] = {"mcmc": {"measure_speeds": False}}
@@ -72,19 +72,6 @@ def cobaya_run_func(logpdf, bounds, output_folder=None,
     return end_state, upd_input, sampler
 
 
-
-def process_cobaya_output_func(cobaya_return_values, output_folder=None):
     return {"samples": sampler.samples(to_getdist=True, combined=True, skip_samples=0.33)}
+def process_output_func(cobaya_return_values, output_folder=None):
     _, upd_input, sampler = cobaya_return_values
-
-
-
-if __name__ == "__main__":
-    # Build PDF
-    if len(sys.argv[1:]) != 1:
-        raise ValueError("Pass likelihood name as first arg, e.g. 'gaussian5'")
-    pdf_name = sys.argv[1]
-    pdf = get_pdf(pdf_name)
-    output_folder = os.path.join("output_cobaya", pdf_name)
-    test_run(pdf, cobaya_run_func, process_cobaya_output_func,
-             output_folder=output_folder)

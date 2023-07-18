@@ -11,7 +11,7 @@ from synth_inference_tests.run import run as test_run
 finite_minus_inf = -1e8  # cannot be too small, or pyVBMC crashes
 
 
-def pyvbmc_run_func(logpdf, bounds, output_folder=None,
+def run_func(logpdf, bounds, output_folder=None,
                     budget=None, budget_count_inf=False, budget_count_parallel=False):
     from pyvbmc import VBMC
     LB, UB = bounds.T
@@ -26,7 +26,7 @@ def pyvbmc_run_func(logpdf, bounds, output_folder=None,
         vbmc = VBMC(logpdf_single_arg, x0, LB, UB, None, None, options=options)
         vp, results = vbmc.optimize()
     except Exception as excpt:
-        end_state = "e"
+        warn(f"pyVBMC finished with an error: {excpt}")
         return "e", None, None, None, None, None
     print("VBMC done!")
     if results["func_count"] >= budget:
@@ -43,7 +43,8 @@ def pyvbmc_run_func(logpdf, bounds, output_folder=None,
     print("VBMC sampled!")
     return end_state, vp, results, Xs, logpdf
 
-def process_pyvbmc_output_func(pyvbmc_return_values, output_folder=None):
+
+def process_output_func(pyvbmc_return_values, output_folder=None):
     _, vp, results, Xs, logpdf = pyvbmc_return_values
     from getdist.mcsamples import MCSamples
     gdsample = MCSamples(samples=Xs, names=[f"x_{i+1}" for i in range(vp.D)])
@@ -59,14 +60,3 @@ def process_pyvbmc_output_func(pyvbmc_return_values, output_folder=None):
         pass
     plt.savefig(os.path.join(plots_folder, "vp.png"))
     return {"samples": gdsample}
-
-
-if __name__ == "__main__":
-    # Build PDF
-    if len(sys.argv[1:]) != 1:
-        raise ValueError("Pass likelihood name as first arg, e.g. 'gaussian5'")
-    pdf_name = sys.argv[1]
-    pdf = get_pdf(pdf_name)
-    output_folder = os.path.join("output_pyvbmc", pdf_name)
-    test_run(pdf, pyvbmc_run_func, process_pyvbmc_output_func,
-             output_folder=output_folder)
