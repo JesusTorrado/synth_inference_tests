@@ -5,6 +5,7 @@ Builds the pdf database and retrieves one or more pdf's based on some dimensiona
 import os
 from inspect import isclass
 import yaml
+from numpy.random import default_rng
 
 import synth_inference_tests.pdfs as pdfs
 
@@ -25,7 +26,7 @@ def import_pdf(name):
                 return class_or_module
 
 
-def get_pdf(name, dim=None, tags=None):
+def get_pdf(name, dim=None, rng=None, tags=None):
     """
     Retrieves pdf according to some criteria.
 
@@ -46,6 +47,8 @@ def get_pdf(name, dim=None, tags=None):
     pdf_args = {}
     if dim is not None:
         pdf_args["dim"] = dim
+    if getattr(pdf_class, "random", False):
+        pdf_args["rng"] = rng or default_rng()
     pdf = pdf_class(**pdf_args)
     return pdf
 
@@ -60,6 +63,7 @@ def get_pdfs(pdf_or_file_name):
                 pdfs_dict = yaml.safe_load(f)
         except FileNotFoundError as excpt:
             raise FileNotFoundError(f"PDFs file {pdf_or_file_name} not found.") from excpt
-        return [get_pdf(pdf_name) for pdf_name in pdfs_dict]
+        rng = default_rng(seed=pdfs_dict.pop("seed", None))
+        return [get_pdf(pdf_name, rng=rng) for pdf_name in pdfs_dict]
     else:  # is pdf name
         return [get_pdf(pdf_or_file_name)]

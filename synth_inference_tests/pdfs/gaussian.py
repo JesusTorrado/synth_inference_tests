@@ -21,13 +21,14 @@ class Gaussian(PDF):
     dim = None
     multimodal = False
     nongaussian = 0
+    random = True
 
-    def __init__(self, dim, seed=None, prior_size_in_std=_prior_size_in_std,
+    def __init__(self, dim, rng=None, prior_size_in_std=_prior_size_in_std,
                  random_mean_in_std=_default_random_mean_in_std):
         super().__init__(dim)
         self.prior_size_in_std = prior_size_in_std
         self.random_mean_in_std = random_mean_in_std
-        self.draw()
+        self.draw(rng=rng)
         self.bounds = np.array([-self.prior_size_in_std * self.std,
                                 self.prior_size_in_std * self.std]).T
 
