@@ -6,10 +6,7 @@ Difficulty: pronounced curving degeneracies.
 
 """
 
-from warnings import warn
-
 import numpy as np
-from scipy.stats import norm, multivariate_normal
 
 from ..pdf import PDF
 

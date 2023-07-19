@@ -69,7 +69,7 @@ def run_func(logpdf, bounds, output_folder=None,
     return end_state, vp, results, Xs, chi2s
 
 
-def process_output_func(output_folder=None, return_values=True):
+def process_output_func(output_folder=None, return_values=None):
     if return_values is not None:
         _, vp, results, Xs, chi2s = return_values
     elif output_folder is not None:

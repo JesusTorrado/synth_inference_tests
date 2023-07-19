@@ -6,12 +6,8 @@ import numpy as np
 from synth_inference_tests.get_pdf import get_pdfs
 from synth_inference_tests.run import run as test_run
 
-if __name__ == "__main__":
-    if len(sys.argv[1:]) != 2:
-        raise ValueError("Pass a valid sampler and a likelihood name as first and second "
-                         "arg, e.g. 'gpry gaussian5'")
-    # Get sampler wrapper
-    sampler_name = sys.argv[1].lower()
+
+def get_wrapper(sampler_name):
     wrapper_name = "wrapper_" + sampler_name
     try:
         wrapper = import_module(wrapper_name)
@@ -24,6 +20,15 @@ if __name__ == "__main__":
     except AttributeError as excpt:
         raise ValueError("The wrapper should contain two functions: 'run_func' and "
                          "'process_output_func' (see documentation).") from excpt
+    return run_func, process_output_func
+
+
+if __name__ == "__main__":
+    if len(sys.argv[1:]) != 2:
+        raise ValueError("Pass a valid sampler and a likelihood name as first and second "
+                         "arg, e.g. 'gpry gaussian5'")
+    sampler_name = sys.argv[1].lower()
+    run_func, process_output_func = get_wrapper(sampler_name)
     # Build PDF (or list of them)
     pdfs = get_pdfs(sys.argv[2])
     for pdf in pdfs:
