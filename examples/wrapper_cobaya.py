@@ -3,6 +3,7 @@ import sys
 import numpy as np
 
 from cobaya.run import run as cobaya_run
+from getdist.mcsamples import loadMCSamples
 
 from synth_inference_tests.get_pdf import get_pdf
 from synth_inference_tests.run import run as test_run
@@ -72,6 +73,13 @@ def run_func(logpdf, bounds, output_folder=None,
     return end_state, upd_input, sampler
 
 
-    return {"samples": sampler.samples(to_getdist=True, combined=True, skip_samples=0.33)}
-def process_output_func(cobaya_return_values, output_folder=None):
-    _, upd_input, sampler = cobaya_return_values
+def process_output_func(output_folder=None, return_values=None):
+    if return_values is not None:
+        _, upd_input, sampler = return_values
+        sample = sampler.products(
+            to_getdist=True, combined=True, skip_samples=0.33)["sample"]
+    elif output_folder is not None:
+        sample_folder = os.path.abspath(output_folder)
+        sample_folder += "/"  # to force GetDist to treat is as folder, not prefix
+        sample = loadMCSamples(sample_folder)
+    return {"samples": sample}
