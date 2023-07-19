@@ -51,7 +51,7 @@ def run(pdf, run_func, process_output_func, output_folder,
         })
     try:
         end_state = return_values[0]
-        assert isinstance(end_state, str) and end_state.lower() in ["c", "b", "e"]
+        assert isinstance(end_state, str) and end_state.lower() in ["c", "b", "e", "?"]
     except (IndexError, AssertionError) as excpt:
         if hasattr(return_values, "__len__"):
             what_return_value_msg = f"Got {return_values[0]}."
@@ -61,6 +61,8 @@ def run(pdf, run_func, process_output_func, output_folder,
         raise ValueError("The first return value for the 'run' function must be the end "
                          "state, in particular one of 'c' (converged), 'b' "
                          f"(budget exhausted), 'e' (errored). {what_return_value_msg}")
+    if end_state == "?":
+        print("The sampler has finished with unknown end state.")
     result["end_state"] = end_state.lower()
     # NB: 'c' means *spontaneous* stop. If budget exhausted and convergence judged likeky
     #     by internal diagnostics, that's still 'b'.
