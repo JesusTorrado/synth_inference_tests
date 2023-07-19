@@ -76,3 +76,9 @@ class GaussianMix(PDF):
             sample[:, 2:] = \
                 self.norm_ge_2.rvs(n * (self.dim - 2)).reshape((n, self.dim - 2))
         return sample
+
+    @property
+    def logZ(self):
+        logZ = 0
+        logZ += -np.sum(np.log(self.bounds.T[1] - self.bounds.T[0]))
+        return logZ

@@ -94,3 +94,9 @@ class LogGammaMix(PDF):
         if self.dims_loggamma:
             _, self._loggamma_interp_1_2 = invCDFinterp(
                 xs, lambda x: np.exp(self.logp_loggamma_1_2(x)))
+
+    @property
+    def logZ(self):
+        logZ = 0
+        logZ += -np.sum(np.log(self.bounds.T[1] - self.bounds.T[0]))
+        return logZ

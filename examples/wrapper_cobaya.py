@@ -76,10 +76,20 @@ def run_func(logpdf, bounds, output_folder=None,
 def process_output_func(output_folder=None, return_values=None):
     if return_values is not None:
         _, upd_input, sampler = return_values
-        sample = sampler.products(
-            to_getdist=True, combined=True, skip_samples=0.33)["sample"]
+        products = sampler.products(
+            to_getdist=True, combined=True, skip_samples=0.33)
+        sample = products["sample"]
+        logZ = products.get("logZ")
+        logZstd = products.get("logZstd")
+        if logZ is not None:  # yaml cannot read numpy floats
+            logZ = float(logZ)
+            logZstd = float(logZstd)
     elif output_folder is not None:
         sample_folder = os.path.abspath(output_folder)
         sample_folder += "/"  # to force GetDist to treat is as folder, not prefix
         sample = loadMCSamples(sample_folder)
-    return {"samples": sample}
+        logZ = None
+    products = {"samples": sample}
+    if logZ is not None:
+        products.update({"logZ": logZ, "logZstd": logZstd})
+    return products

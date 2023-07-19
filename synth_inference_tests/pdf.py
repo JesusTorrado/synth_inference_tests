@@ -60,6 +60,10 @@ class PDF():
     def samples(self, n=None):
         return None
 
+    @property
+    def logZ(self):
+        return None
+
     def triangle_plot(self, n=None, filename=None):
         """
         Does a triangle plot with the given number of samples. Optionally exports it to

@@ -60,3 +60,10 @@ class Funnel(PDF):
         else:
             sample[:, 1:] = np.multiply(corr_samples, transf_factor[:, np.newaxis])
         return sample
+
+    @property
+    def logZ(self):
+        logZ = 0  # if prior is [-10, 10], corrected in next step
+        logZ += np.sum(np.log(20 * np.ones(self.dim)))
+        logZ += -np.sum(np.log(self.bounds.T[1] - self.bounds.T[0]))
+        return logZ

@@ -75,6 +75,11 @@ def run(pdf, run_func, process_output_func, output_folder,
     sample_results = process_output_func(
         output_folder=products_folder, return_values=return_values)
 
+    # Evidence
+    result["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
+    if sample_results.get("logZ") is not None:
+        result["logZ"] = float(sample_results["logZ"])
+        result["logZstd"] = float(sample_results["logZstd"])
 
     # Save results object
     dump_result(result, output_folder)
