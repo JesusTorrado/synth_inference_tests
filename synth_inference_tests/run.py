@@ -68,9 +68,9 @@ def run(pdf, run_func, process_output_func, output_folder,
         dump_result(result, output_folder)
         return
 
-    # Compute/process necessary quantities for the report
+    # Compute/process necessary quantities for the report, do sampler-internal plots, etc.
     sample_results = process_output_func(
-        return_values, output_folder=products_folder)
+        output_folder=products_folder, return_values=return_values)
 
 
     # Save results object

@@ -4,9 +4,12 @@ from warnings import warn
 import numpy as np
 
 from gpry.run import Runner
+from getdist.mcsamples import loadMCSamples
 
 from synth_inference_tests.get_pdf import get_pdf
 from synth_inference_tests.run import run as test_run
+
+sample_subdir = "sample"
 
 
 # TODO: remove after combining with gpry.tools.create_cobaya_model
@@ -67,7 +70,10 @@ def run_func(logpdf, bounds, output_folder=None,
         warn(f"GPry finished with an error: {excpt}")
         return "e", None, None
     # Generating MC sample considered part of the process:
-    upd_input, sampler = runner.generate_mc_sample(sampler="polychord")
+    sample_folder = os.path.abspath(os.path.join(output_folder, sample_subdir))
+    sample_folder += "/"  # to force Cobaya to use as folder, not prefix
+    upd_input, sampler = runner.generate_mc_sample(
+        sampler="polychord", output=sample_folder)
     if runner.has_converged:
         end_state = "c"
     elif runner.n_total_left == 0:
@@ -77,10 +83,19 @@ def run_func(logpdf, bounds, output_folder=None,
     return end_state, runner, upd_input, sampler
 
 
-def process_output_func(gpry_return_values, output_folder=None):
-    _, runner, upd_input, sampler = gpry_return_values
+def process_output_func(output_folder=None, return_values=None):
+    if return_values is not None:
+        _, runner, upd_input, sampler = return_values
+        sample = sampler.products(
+            to_getdist=True, combined=True, skip_samples=0.33)["sample"]
+        runner.plot_mc(upd_input, sampler, add_training=True)
+        runner.plot_distance_distribution(upd_input, sampler, show_added=True)
+    elif output_folder is not None:
+        runner = Runner(checkpoint=output_folder, load_checkpoint="resume")
+        sample_folder = os.path.abspath(os.path.join(output_folder, sample_subdir))
+        sample_folder += "/"  # to force GetDist to treat is as folder, not prefix
+        sample = loadMCSamples(sample_folder)
+        runner.plot_mc(sample_folder, add_training=True)
     # Do some GPry plots too
     runner.plot_progress()
-    runner.plot_mc(upd_input, sampler, add_training=True)
-    return {"samples": sampler.products(
-        to_getdist=True, combined=True, skip_samples=0.33)["sample"]}
+    return {"samples": sample}
