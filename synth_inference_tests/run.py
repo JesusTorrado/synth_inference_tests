@@ -72,9 +72,6 @@ def run(pdf, run_func, process_output_func, output_folder,
     sample_results = process_output_func(
         return_values, output_folder=products_folder)
 
-    # Save results object
-    with open(os.path.join(output_folder, result_file), "w") as f:
-        yaml.dump(result, f)
 
     # Save results object
     dump_result(result, output_folder)
@@ -111,4 +108,3 @@ def plot_triangle(sample, output_folder, pdf=None):
     g.triangle_plot(to_plot, params=paramnames, filled=filled,
                     legend_labels=labels, contour_colors=colors)
     g.export(os.path.join(output_folder, "triangle.png"))
-

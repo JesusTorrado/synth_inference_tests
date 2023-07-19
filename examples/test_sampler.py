@@ -30,5 +30,9 @@ if __name__ == "__main__":
         msg = f"*** Sampling from pdf {pdf.NameDim} " + "*" * 50
         print("\n" + "*" * len(msg) + "\n" + msg + "\n" + "*" * len(msg) + "\n")
         output_folder = os.path.join("output_" + sampler_name, pdf.NameDim)
+        try:
+            os.makedirs(output_folder)
+        except FileExistsError:
+            pass
         test_run(pdf, run_func, process_output_func,
                  output_folder=output_folder)
