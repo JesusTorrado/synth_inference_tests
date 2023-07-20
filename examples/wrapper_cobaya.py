@@ -91,7 +91,7 @@ def process_output_func(output_folder=None, return_values=None):
         logZ = None
     # Create a "logpost" derived parameter with the **logposterior**
     sample.addDerived(-sample.loglikes, "logpost")
-    products = {"samples": sample}
+    products = {"sampler": "cobaya:" + sampler.get_name(), "samples": sample}
     if logZ is not None:
         products.update({"logZ": logZ, "logZstd": logZstd})
     return products

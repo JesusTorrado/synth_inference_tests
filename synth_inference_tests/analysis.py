@@ -35,6 +35,7 @@ def create_table(output_folder):
         # Environment
         "(MPI, threads)",
         # Result
+        "sampler",
         "end_state",
         "n_truth",
         "time_overhead"

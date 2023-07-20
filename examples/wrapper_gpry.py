@@ -104,7 +104,7 @@ def process_output_func(output_folder=None, return_values=None):
     runner.plot_progress()
     # Create a "logpost" derived parameter with the **logposterior**
     sample.addDerived(-sample.loglikes, "logpost")
-    products = {"samples": sample}
+    products = {"sampler": "gpry", "samples": sample}
     if logZ is not None:
         products.update({"logZ": logZ, "logZstd": logZstd})
     products["logp_func"] = lambda x: runner.gpr.predict(np.atleast_2d(x))

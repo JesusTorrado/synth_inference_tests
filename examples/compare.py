@@ -25,8 +25,8 @@ if __name__ == "__main__":
         folders[sampler] = folder
         process_funcs[sampler] = get_wrapper(sampler)[1]
         tables[sampler] = create_table(folder)
-        tables[sampler]["sampler"] = sampler
         tables[sampler]["folder"] = folder
+        sampler = tables[sampler]["sampler"]
     # Simple for now: merge tables and re-sort with folder as last priority.
     # TODO: delete non-common cases
     comparison_table = pd.concat(list(tables.values()))

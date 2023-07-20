@@ -97,7 +97,7 @@ def process_output_func(output_folder=None, return_values=None):
     vp.plot(plot_data=True, plot_vp_centres=True)
     import matplotlib.pyplot as plt
     plt.savefig(os.path.join(plots_folder, "vp.png"))
-    products = {"samples": gdsample}
+    products = {"sampler": "pyvbmc", "samples": gdsample}
     # NB: logZ here are ELBO's!
     products["logZ"] = results["elbo"]
     products["logZstd"] = results["elbo_sd"]

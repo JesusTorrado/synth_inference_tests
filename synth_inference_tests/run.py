@@ -75,6 +75,7 @@ def run(pdf, run_func, process_output_func, output_folder,
     # Compute/process necessary quantities for the report, do sampler-internal plots, etc.
     sample_results = process_output_func(
         output_folder=products_folder, return_values=return_values)
+    result["sampler"] = sample_results["sampler"]
 
     # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
     # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
