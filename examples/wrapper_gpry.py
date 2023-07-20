@@ -86,11 +86,11 @@ def run_func(logpdf, bounds, output_folder=None,
 def process_output_func(output_folder=None, return_values=None):
     if return_values is not None:
         _, runner, upd_input, sampler = return_values
-        products = sampler.products(
+        sampler_products = sampler.products(
             to_getdist=True, combined=True, skip_samples=0.33)
-        sample = products["sample"]
-        logZ = products.get("logZ")
-        logZstd = products.get("logZstd")
+        sample = sampler_products["sample"]
+        logZ = sampler_products.get("logZ")
+        logZstd = sampler_products.get("logZstd")
         runner.plot_mc(upd_input, sampler, add_training=True)
         runner.plot_distance_distribution(upd_input, sampler, show_added=True)
     elif output_folder is not None:

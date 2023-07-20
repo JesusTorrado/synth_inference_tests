@@ -63,7 +63,7 @@ class Gaussian(PDF):
         if n is None:
             n = 100000  # seems to work OK for dim <= 20
         samples = self.rv.rvs(n)
-        i_not_too_low = np.logical_and(*(samples > self.bounds[:, 0]).T)
-        i_not_too_high = np.logical_and(*(samples < self.bounds[:, 1]).T)
+        i_not_too_low = np.logical_and.reduce((samples > self.bounds[:, 0]).T)
+        i_not_too_high = np.logical_and.reduce((samples < self.bounds[:, 1]).T)
         samples = samples[np.logical_and(i_not_too_low, i_not_too_high)]
         return samples

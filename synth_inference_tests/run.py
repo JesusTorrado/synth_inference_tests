@@ -142,7 +142,10 @@ def plot_triangle(sample, output_folder, filename="triangle.png", pdf=None,
         truth_sample = pdf.samples()
         if truth_sample is not None:
             from getdist.mcsamples import MCSamples
-            truth_sample = MCSamples(samples=truth_sample, names=sampled_paramnames)
+            kwargs = {"names": sampled_paramnames}
+            kwargs["ranges"] = {
+                p: pdf.bounds[i] for i, p in enumerate(sampled_paramnames)}
+            truth_sample = MCSamples(samples=truth_sample, **kwargs)
             to_plot += [truth_sample]
             filled += [False]
             labels += ["Truth"]
