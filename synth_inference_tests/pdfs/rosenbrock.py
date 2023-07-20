@@ -25,9 +25,11 @@ class Rosenbrock(PDF):
         super().__init__(dim)
         self.bounds = np.array(dim * [[-5, 5]])
 
-    def logp(self, *params):
-        params = np.array(params)
-        return -np.sum((1 - params[:-1])**2 + 100 * (params[1:] - params[:-1]**2)**2)
+    def logp(self, params):
+        params = np.atleast_2d(params)
+        return -np.sum(
+            (1 - params[:, :-1])**2 + 100 * (params[:, 1:] - params[:, :-1]**2)**2,
+            axis=-1)
 
     def samples(self, n=None):
         pass

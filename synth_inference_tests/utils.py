@@ -1,11 +1,57 @@
 import numpy as np
+from numpy.linalg import det
 from scipy import integrate
 from scipy import interpolate
 
 
+def kl_sym(sample_1, logp_sample_1, logp_2_sample_1,
+           sample_2, logp_sample_2, logp_1_sample_2, weights_1=None, weights_2=None):
+    """
+    Computes the Jeffrey's divergence between two distributions given samples of each and
+    their log-posterior functions.
+    """
+    P_to_Q = kl(sample_1, logp_sample_1, logp_2_sample_1, weights_P=weights_1)
+    Q_to_P = kl(sample_2, logp_sample_2, logp_1_sample_2, weights_P=weights_2)
+    return P_to_Q + Q_to_P
+
+
+# Originally from GPry
+def kl(sample_P, logp_sample_P, logp_Q_sample_P, weights_P=None):
+    """
+    Computes a Monte Carlo estimate of the Kullback-Leibler divergence ``KL(P|Q)`` given
+    a sample from ``P`` and the log-posterior ``Q`` for that sample.
+    """
+    if weights_P is None:
+        weights_P = np.ones(len(sample_P))
+    else:
+        # Numerical stability: make the highest weight 1
+        weights_P /= max(weights_P)
+    kl = np.sum(weights_P * (logp_sample_P - logp_Q_sample_P)) / np.sum(weights_P)
+    return kl
+
+
+def kl_norm_sym(mean_0, cov_0, mean_1, cov_1):
+    return kl_norm(mean_0, cov_0, mean_1, cov_1) + kl_norm(mean_1, cov_1, mean_0, cov_0)
+
+
+def kl_norm(mean_0, cov_0, mean_1, cov_1):
+    """
+    Computes the KL divergence between two normal distributions defined by their means
+    and covariance matrices.
+
+    May raise ``numpy.linalg.LinAlgError``.
+    """
+    cov_1_inv = np.linalg.inv(cov_1)
+    dim = len(mean_0)
+    return 0.5 * (np.log(det(cov_1)) - np.log(det(cov_0)) - dim +
+                  np.trace(cov_1_inv @ cov_0) +
+                  (mean_1 - mean_0).T @ cov_1_inv @ (mean_1 - mean_0))
+
+
+# Originally from extrapops (SOBBH population synthesis)
 def invCDFinterp(xs, pdf_func, pdf_args=None, splrep_kwargs=None):
     """
-    Prepares an interpolator for invCDF sampling.
+    Prepares an interpolator for 1-dimensional invCDF sampling.
 
     ``xs`` samples are assumed sorted.
 

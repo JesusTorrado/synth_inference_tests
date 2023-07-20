@@ -2,11 +2,12 @@ import os
 from time import time
 from typing import Mapping, Sequence
 
+import numpy as np
 import yaml
 
 from .pdf import PDF
 from .mpi import is_main_process, multiple_processes, mpi_comm, mpi_size, get_num_threads
-
+from .utils import kl_sym, kl_norm_sym
 
 result_file = "result.yaml"
 
@@ -65,7 +66,7 @@ def run(pdf, run_func, process_output_func, output_folder,
     if end_state == "?":
         print("The sampler has finished with unknown end state.")
     result["end_state"] = end_state.lower()
-    # NB: 'c' means *spontaneous* stop. If budget exhausted and convergence judged likeky
+    # NB: 'c' means *spontaneous* stop. If budget exhausted and convergence judged likely
     #     by internal diagnostics, that's still 'b'.
     if end_state == 'e':
         dump_result(result, output_folder)
@@ -75,12 +76,37 @@ def run(pdf, run_func, process_output_func, output_folder,
     sample_results = process_output_func(
         output_folder=products_folder, return_values=return_values)
 
+    # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
+    # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
+    sample_ref = pdf.samples()
+    logp_func = sample_results.get("logp_func")
+    if sample_ref is not None and logp_func is not None:
+        sampled_params = [
+            p.name for p in sample_results["samples"].getParamNames().names
+            if not p.isDerived]
+        sample = np.array([sample_results["samples"][p] for p in sampled_params]).T
+        weights = sample_results["samples"].weights
+        # This is a log-posterior sample, not a log-likelihood,
+        sample_logp = sample_results["samples"]["logpost"]
+        # so the reference pdf must be the logposterior too!
+        sample_logp_ref = pdf.logpost(sample)
+        sample_ref_logp_ref = pdf.logpost(sample_ref)
+        sample_ref_logp = logp_func(sample_ref)
+        result["kl"] = float(kl_sym(sample, sample_logp, sample_logp_ref,
+                                    sample_ref, sample_ref_logp_ref, sample_ref_logp,
+                                    weights_1=weights))
+        result["kl_norm"] = float(kl_norm_sym(
+            np.average(sample, weights=weights, axis=0),
+            np.cov(sample.T, aweights=weights),
+            np.average(sample_ref, axis=0), np.cov(sample_ref.T)))
+
     # Evidence
     result["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
     if sample_results.get("logZ") is not None:
         result["logZ"] = float(sample_results["logZ"])
         result["logZstd"] = float(sample_results["logZstd"])
 
+    result["notes"] = sample_results.get("notes")
     # Save results object
     dump_result(result, output_folder)
 
@@ -110,7 +136,7 @@ def plot_triangle(sample, output_folder, filename="triangle.png", pdf=None,
     colors = list(tab10_colors[:len(to_plot)])
     paraminfos = to_plot[0].getParamNames().names
     sampled_paramnames = [p.name for p in paraminfos if not p.isDerived]
-    paramnames = sampled_paramnames + ["chi2"]
+    paramnames = sampled_paramnames + ["logpost"]
     if pdf is not None:
         truth_sample = pdf.samples()
         if truth_sample is not None:

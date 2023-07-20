@@ -56,10 +56,14 @@ class Gaussian(PDF):
         mean = rng.uniform(low=-1., size=dim) * stds * random_mean_in_std
         return mean, cov, stds
 
-    def logp(self, *params):
+    def logp(self, params):
         return self.rv.logpdf(params)
 
     def samples(self, n=None):
         if n is None:
             n = 100000  # seems to work OK for dim <= 20
-        return self.rv.rvs(n)
+        samples = self.rv.rvs(n)
+        i_not_too_low = np.logical_and(*(samples > self.bounds[:, 0]).T)
+        i_not_too_high = np.logical_and(*(samples < self.bounds[:, 1]).T)
+        samples = samples[np.logical_and(i_not_too_low, i_not_too_high)]
+        return samples

@@ -40,10 +40,13 @@ class Funnel(PDF):
         self.corr_rest = np.full(shape=(dim - 1, dim - 1), fill_value=0.95)
         np.fill_diagonal(self.corr_rest, 1)
 
-    def logp(self, *params):
-        cov = np.exp(params[0]) * self.corr_rest
-        return (self.dim * np.log(20) + self.rv_1.logpdf(params[0]) +
-                multivariate_normal.logpdf(params[1:], mean=self.mean_rest, cov=cov))
+    def logp(self, params):
+        params = np.atleast_2d(params)
+        x1 = params[:, 0]
+        covs = np.exp(x1)[:, np.newaxis, np.newaxis] * self.corr_rest
+        return (self.dim * np.log(20) + self.rv_1.logpdf(x1) +
+                np.array([multivariate_normal.logpdf(p, mean=self.mean_rest, cov=cov)
+                          for p, cov in zip(params[:, 1:], covs)]))
 
     def samples(self, n=None):
         if n is None:

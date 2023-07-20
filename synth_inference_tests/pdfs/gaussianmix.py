@@ -48,13 +48,14 @@ class GaussianMix(PDF):
             mean=(self.mean_1_2, self.mean_2_2), cov=self.cov_a)
         self.norm_ge_2 = norm(loc=self.mean_1_2, scale=self.std)
 
-    def logp(self, *params):
-        params = np.array(params)
+    def logp(self, params):
+        params = np.atleast_2d(params)
+        x1x2 = params[:, :2]
         logp = np.log(0.25) + np.log(
-            self.norm_ul.pdf(params[:2]) + self.norm_ur.pdf(params[:2]) +
-            self.norm_bl.pdf(params[:2]) + self.norm_br.pdf(params[:2]))
+            self.norm_ul.pdf(x1x2) + self.norm_ur.pdf(x1x2) +
+            self.norm_bl.pdf(x1x2) + self.norm_br.pdf(x1x2))
         if self.dim > 2:
-            logp += np.sum(self.norm_ge_2.logpdf(params[2:]))
+            logp += np.sum(self.norm_ge_2.logpdf(params[:, 2:]), axis=-1)
         return logp
 
     def samples(self, n=None):

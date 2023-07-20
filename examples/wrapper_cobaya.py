@@ -40,7 +40,7 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     # NB: `logp` methods in this package have unnamed args, which Cobaya does not support.
     # We need to create a wrapper with named args.
     def lkl(**kwargs):
-        return loglikelihood(*list(kwargs.values()))
+        return loglikelihood(list(kwargs.values()))
 
     info.update({"likelihood": {"test": {
         "external": lkl, "requires": {},
@@ -89,6 +89,8 @@ def process_output_func(output_folder=None, return_values=None):
         sample_folder += "/"  # to force GetDist to treat is as folder, not prefix
         sample = loadMCSamples(sample_folder)
         logZ = None
+    # Create a "logpost" derived parameter with the **logposterior**
+    sample.addDerived(-sample.loglikes, "logpost")
     products = {"samples": sample}
     if logZ is not None:
         products.update({"logZ": logZ, "logZstd": logZstd})

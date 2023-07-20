@@ -24,7 +24,7 @@ def create_table(output_folder):
     columns = list(rows[0])
     table_dict = {col: [row.get(col, None) for row in rows] for col in columns}
     table = pd.DataFrame(table_dict)
-    preferred_order = [
+    first_columns = [
         # PDF
         "pdf",
         "dim",
@@ -36,10 +36,13 @@ def create_table(output_folder):
         "n_truth",
         "time_overhead"
         ]
+    last_columns = ["notes"]
     ignore_columns = ["time_truth"]
-    new_columns_order = [col for col in preferred_order if col in table.columns]
+    new_columns_order = [col for col in first_columns if col in table.columns]
     new_columns_order += [col for col in table.columns if col not in new_columns_order]
-    new_columns_order = [col for col in new_columns_order if col not in ignore_columns]
+    new_columns_order = [col for col in new_columns_order
+                         if col not in set(ignore_columns).union(last_columns)]
+    new_columns_order += [col for col in last_columns if col in table.columns]
     table = table[new_columns_order]
     table.sort_values(["pdf", "dim"], inplace=True)
     return table

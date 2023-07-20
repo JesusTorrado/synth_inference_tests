@@ -50,15 +50,15 @@ class LogGammaMix(PDF):
         self.dims_loggamma = list(range(2, 1 + self.last_loggamma_index))
         self.dims_norm = list(range(1 + self.last_loggamma_index, self.dim))
 
-    def logp(self, *params):
-        params = np.array(params)
-        logp = self.logp_loggamma_1(params[0])
-        logp += np.log(0.5) + np.log(self.norm_2_1.pdf(params[1]) +
-                                     self.norm_2_2.pdf(params[1]))
+    def logp(self, params):
+        params = np.atleast_2d(params)
+        logp = self.logp_loggamma_1(params[:, 0])
+        logp += np.log(0.5) + np.log(self.norm_2_1.pdf(params[:, 1]) +
+                                     self.norm_2_2.pdf(params[:, 1]))
         if self.dims_loggamma:
-            logp += np.sum(self.logp_loggamma_1_2(params[self.dims_loggamma]))
+            logp += np.sum(self.logp_loggamma_1_2(params[:, self.dims_loggamma]), axis=-1)
         if self.dims_norm:
-            logp += np.sum(self.norm_2_2.logpdf(params[self.dims_norm]))
+            logp += np.sum(self.norm_2_2.logpdf(params[:, self.dims_norm]), axis=-1)
         return logp
 
     def samples(self, n=None):

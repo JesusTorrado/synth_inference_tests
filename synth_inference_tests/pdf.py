@@ -20,6 +20,7 @@ Custom methods:
 
 import inspect
 import time
+import numpy as np
 
 from .mpi import is_main_process
 
@@ -34,6 +35,7 @@ class PDF():
             self.dim = dim
         self.n = 0
         self.t = 0
+        self.bounds = None
 
     @property
     def NameDim(self):
@@ -50,12 +52,20 @@ class PDF():
             return dim >= dim_min
         return False
 
-    def logpdf(self, *params):
+    def logpdf(self, params):
         self.n += 1
         start = time.time()
-        logp = self.logp(*params)
+        logp = self.logp(params)
         self.t += time.time() - start
         return logp
+
+    @property
+    def logprior_density(self):
+        if self.bounds is not None:
+            return -np.sum(np.log(self.bounds.T[1] - self.bounds.T[0]))
+
+    def logpost(self, params):
+        return self.logpdf(params) + self.logprior_density
 
     def samples(self, n=None):
         return None
@@ -80,7 +90,10 @@ class PDF():
         sample = self.samples(n)
         if sample is None:
             raise NotImplementedError("Reference samples not implemented for this pdf.")
-        gdsample = MCSamples(samples=sample)
+        kwargs = {"names": [f"x_{i + 1}" for i in range(self.dim)]}
+        if getattr(self, "bounds", None) is not None:
+            kwargs["ranges"] = {p: self.bounds[i] for i, p in enumerate(kwargs["names"])}
+        gdsample = MCSamples(samples=sample, **kwargs)
         g = gdplt.get_subplot_plotter()
         g.triangle_plot(gdsample)
         if filename:
