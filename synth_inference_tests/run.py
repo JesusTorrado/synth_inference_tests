@@ -29,7 +29,7 @@ def run(pdf, run_func, process_output_func, output_folder,
     plots_folder = os.path.join(output_folder, "plots")
     # Basic inputs
     if is_main_process:
-        result = {
+        results = {
             "pdf": pdf.__class__.__name__,
             "dim": pdf.dim,
             "n_processes": mpi_size,
@@ -37,84 +37,74 @@ def run(pdf, run_func, process_output_func, output_folder,
         }
     # Run external sampler
     start_total = time()
-    return_values = run_func(pdf.logpdf, pdf.bounds, output_folder=products_folder,
-                             budget=None, budget_count_inf=False,
-                             budget_count_parallel=False)
+    results_upd, return_values = run_func(
+        pdf.logpdf, pdf.bounds, output_folder=products_folder,
+        budget=None, budget_count_inf=False, budget_count_parallel=False)
     delta_total = time() - start_total
     # Timings and # evals
     time_pdf = mpi_comm.gather(pdf.t)
     n_evals_pdf = mpi_comm.gather(pdf.n)
     time_overhead = mpi_comm.gather(delta_total - pdf.t)
     if is_main_process:
-        result.update({
+        results.update(results_upd)
+        results.update({
             "time_truth": max(time_pdf),
             "n_truth": max(n_evals_pdf),
             "time_overhead": max(time_overhead),
         })
-    try:
-        end_state = return_values[0]
-        assert isinstance(end_state, str) and end_state.lower() in ["c", "b", "e", "?"]
-    except (IndexError, AssertionError) as excpt:
-        if hasattr(return_values, "__len__"):
-            what_return_value_msg = f"Got {return_values[0]}."
-        else:
-            what_return_value_msg = ("Cannot get first element of return values "
-                                     "(not a tuple?).")
-        raise ValueError("The first return value for the 'run' function must be the end "
-                         "state, in particular one of 'c' (converged), 'b' "
-                         f"(budget exhausted), 'e' (errored). {what_return_value_msg}")
-    if end_state == "?":
-        print("The sampler has finished with unknown end state.")
-    result["end_state"] = end_state.lower()
+    end_state = results.get("end_state")
+    if not isinstance(end_state, str) or \
+       not end_state.lower() in ["c", "b", "e", "?"]:
+        raise ValueError("'end_state' must be one of 'c' (converged), 'b' "
+                         f"(budget exhausted), 'e' (errored). Got {end_state}")
     # NB: 'c' means *spontaneous* stop. If budget exhausted and convergence judged likely
     #     by internal diagnostics, that's still 'b'.
-    if end_state == 'e':
-        dump_result(result, output_folder)
-        return
+    if end_state == "?":
+        print("The sampler has finished with unknown end state.")
+    elif end_state == 'e':
+        dump_result(results, output_folder)
+        return results
 
     # Compute/process necessary quantities for the report, do sampler-internal plots, etc.
-    sample_results = process_output_func(
+    sampler_results = process_output_func(
         output_folder=products_folder, return_values=return_values)
-    result["sampler"] = sample_results["sampler"]
+    results.update(sampler_results)
 
     # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
     # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
+    sample_orig = results.pop("samples")
     sample_ref = pdf.samples()
-    logp_func = sample_results.get("logp_func")
+    logp_func = results.pop("logp_func", None)
     if sample_ref is not None and logp_func is not None:
         sampled_params = [
-            p.name for p in sample_results["samples"].getParamNames().names
+            p.name for p in sample_orig.getParamNames().names
             if not p.isDerived]
-        sample = np.array([sample_results["samples"][p] for p in sampled_params]).T
-        weights = sample_results["samples"].weights
+        sample = np.array([sample_orig[p] for p in sampled_params]).T
+        weights = sample_orig.weights
         # This is a log-posterior sample, not a log-likelihood,
-        sample_logp = sample_results["samples"]["logpost"]
+        sample_logp = sample_orig["logpost"]
         # so the reference pdf must be the logposterior too!
         sample_logp_ref = pdf.logpost(sample)
         sample_ref_logp_ref = pdf.logpost(sample_ref)
         sample_ref_logp = logp_func(sample_ref)
-        result["kl"] = float(kl_sym(sample, sample_logp, sample_logp_ref,
+        results["kl"] = float(kl_sym(sample, sample_logp, sample_logp_ref,
                                     sample_ref, sample_ref_logp_ref, sample_ref_logp,
                                     weights_1=weights))
-        result["kl_norm"] = float(kl_norm_sym(
+        results["kl_norm"] = float(kl_norm_sym(
             np.average(sample, weights=weights, axis=0),
             np.cov(sample.T, aweights=weights),
             np.average(sample_ref, axis=0), np.cov(sample_ref.T)))
 
     # Evidence
-    result["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
-    if sample_results.get("logZ") is not None:
-        result["logZ"] = float(sample_results["logZ"])
-        result["logZstd"] = float(sample_results["logZstd"])
+    results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
 
-    result["notes"] = sample_results.get("notes")
     # Save results object
-    dump_result(result, output_folder)
+    dump_result(results, output_folder)
 
     # Plots
     if is_main_process:
-        plot_triangle(sample_results["samples"], pdf=pdf, output_folder=plots_folder)
-
+        plot_triangle(sample_orig, pdf=pdf, output_folder=plots_folder)
+    return results
 
 def dump_result(result, output_folder):
     with open(os.path.join(output_folder, result_file), "w") as f:

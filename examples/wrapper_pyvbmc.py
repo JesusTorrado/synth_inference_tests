@@ -30,6 +30,7 @@ def load_sample(output_folder):
 
 def run_func(logpdf, bounds, output_folder=None,
              budget=None, budget_count_inf=False, budget_count_parallel=False):
+    results = {"sampler": "pyvbmc"}
     LB, UB = bounds.T
     x0 = LB + (UB - LB) / 2
     options = {}
@@ -40,21 +41,21 @@ def run_func(logpdf, bounds, output_folder=None,
     logpdf_single_arg = lambda X: max(logpdf(X), finite_minus_inf)
     try:
         vbmc = VBMC(logpdf_single_arg, x0, LB, UB, None, None, options=options)
-        vp, results = vbmc.optimize()
+        vp, products = vbmc.optimize()
     except Exception as excpt:
         warn(f"pyVBMC finished with an error: {excpt}")
         return "e", None, None, None, None, None
     print("VBMC done!")
-    if results["func_count"] >= budget:
-        end_state = "b"
+    if products["func_count"] >= budget:
+        results["end_state"] = "b"
         # TODO: fix this!
-        if results["func_count"] > budget:
-            warn(f"More lopposterior evaluations ({results['func_count']}) "
+        if products["func_count"] > budget:
+            warn(f"More lopposterior evaluations ({products['func_count']}) "
                  f"than budgeted ({budget}).")
-    elif results["convergence_status"].lower() == "probable":
-        end_state = "c"
+    elif products["convergence_status"].lower() == "probable":
+        results["end_state"] = "c"
     else:
-        end_state = "?"
+        results["end_state"] = "?"
     Xs, _ = vp.sample(10000)
     print("VBMC sampled!")
     # Save everything that would be returned
@@ -68,20 +69,20 @@ def run_func(logpdf, bounds, output_folder=None,
     vp.iteration = 99
     vp.save(os.path.join(output_folder, pyvbmc_obj_filename), overwrite=True)
     with open(os.path.join(output_folder, pyvbmc_results_filename), "wb") as f:
-        pickle.dump(results, f)
+        pickle.dump(products, f)
     save_sample(Xs, logposts, bounds, output_folder)
     # Returning (Xs, logposts, bounds) instead of a GetDist sample in order not to add
     # unnecessary overhead.
-    return end_state, vp, results, Xs, logposts, bounds
+    return results, (vp, products, Xs, logposts, bounds)
 
 
 def process_output_func(output_folder=None, return_values=None):
     if return_values is not None:
-        _, vp, results, Xs, logposts, bounds = return_values
+        vp, sampler_results, Xs, logposts, bounds = return_values
     elif output_folder is not None:
         vp = VBMC.load(os.path.join(output_folder, pyvbmc_obj_filename))
         with open(os.path.join(output_folder, pyvbmc_results_filename), "rb") as f:
-            results = pickle.load(f)
+            sampler_results = pickle.load(f)
         Xs, logposts, bounds = load_sample(output_folder)
     from getdist.mcsamples import MCSamples
     kwargs = {"names": [f"x_{i+1}" for i in range(vp.D)]}
@@ -97,10 +98,10 @@ def process_output_func(output_folder=None, return_values=None):
     vp.plot(plot_data=True, plot_vp_centres=True)
     import matplotlib.pyplot as plt
     plt.savefig(os.path.join(plots_folder, "vp.png"))
-    products = {"sampler": "pyvbmc", "samples": gdsample}
+    results = {"samples": gdsample}
     # NB: logZ here are ELBO's!
-    products["logZ"] = results["elbo"]
-    products["logZstd"] = results["elbo_sd"]
-    products["logp_func"] = lambda X: vp.log_pdf(X).T[0]
-    products["notes"] = "logZ is an ELBO"
-    return products
+    results["logZ"] = sampler_results["elbo"]
+    results["logZstd"] = sampler_results["elbo_sd"]
+    results["logp_func"] = lambda X: vp.log_pdf(X).T[0]
+    results["notes"] = "logZ is an ELBO"
+    return results

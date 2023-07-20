@@ -1,6 +1,7 @@
 import os
 import sys
 from importlib import import_module
+from pprint import pprint
 import numpy as np
 
 from synth_inference_tests.get_pdf import get_pdfs
@@ -39,5 +40,8 @@ if __name__ == "__main__":
             os.makedirs(output_folder)
         except FileExistsError:
             pass
-        test_run(pdf, run_func, process_output_func,
-                 output_folder=output_folder)
+        results = test_run(pdf, run_func, process_output_func,
+                           output_folder=output_folder)
+        print("\n----RESULTS----\n")
+        pprint(results)
+        print()

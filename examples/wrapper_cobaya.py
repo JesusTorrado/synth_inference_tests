@@ -58,6 +58,8 @@ def run_func(logpdf, bounds, output_folder=None,
     input_dict = cobaya_model_input(logpdf, bounds, paramnames=None)
 #    input_dict["sampler"] = {"mcmc": {"measure_speeds": False}}
     input_dict["sampler"] = {"polychord": {"measure_speeds": False}}
+
+    results = {"sampler": f"cobaya:{list(input_dict['sampler'].keys())[0]}"}
     if not output_folder.endswith(r"\\"):
         output_folder = output_folder + "/"
     input_dict["output"] = output_folder
@@ -65,17 +67,18 @@ def run_func(logpdf, bounds, output_folder=None,
     try:
         upd_input, sampler = cobaya_run(input_dict)
     except Exception:
-        return "e", None, None
+        results["end_state"] = "e"
+        return results, None
 
     # TODO: for now budget not managed
-    end_state = "c"
+    results["end_state"] = "c"
 
-    return end_state, upd_input, sampler
+    return results, (upd_input, sampler)
 
 
 def process_output_func(output_folder=None, return_values=None):
     if return_values is not None:
-        _, upd_input, sampler = return_values
+        upd_input, sampler = return_values
         products = sampler.products(
             to_getdist=True, combined=True, skip_samples=0.33)
         sample = products["sample"]
@@ -91,7 +94,7 @@ def process_output_func(output_folder=None, return_values=None):
         logZ = None
     # Create a "logpost" derived parameter with the **logposterior**
     sample.addDerived(-sample.loglikes, "logpost")
-    products = {"sampler": "cobaya:" + sampler.get_name(), "samples": sample}
+    results ={"samples": sample}
     if logZ is not None:
-        products.update({"logZ": logZ, "logZstd": logZstd})
-    return products
+        results.update({"logZ": logZ, "logZstd": logZstd})
+    return results

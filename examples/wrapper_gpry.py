@@ -38,6 +38,7 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
 
 def run_func(logpdf, bounds, output_folder=None,
              budget=None, budget_count_inf=False, budget_count_parallel=False):
+    results = {"sampler": "gpry"}
     # TODO: [logpdf, bounds] cannot be passed to GPRY at the moment if logpdf has unnamed
     #       args. Use the same model generator as in the cobaya test.
     model_input = cobaya_model_input(logpdf, bounds)
@@ -68,24 +69,25 @@ def run_func(logpdf, bounds, output_folder=None,
         runner.run()
     except Exception as excpt:
         warn(f"GPry finished with an error: {excpt}")
-        return "e", None, None
+        results["end_state"] = "e"
+        return results, None
     # Generating MC sample considered part of the process:
     sample_folder = os.path.abspath(os.path.join(output_folder, sample_subdir))
     sample_folder += "/"  # to force Cobaya to use as folder, not prefix
     upd_input, sampler = runner.generate_mc_sample(
         sampler="polychord", output=sample_folder)
     if runner.has_converged:
-        end_state = "c"
+        results["end_state"] = "c"
     elif runner.n_total_left == 0:
-        end_state = "b"
+        results["end_state"] = "b"
     else:
-        end_state = "?"  # will fail later
-    return end_state, runner, upd_input, sampler
+        results["end_state"] = "?"  # will fail later
+    return results, (runner, upd_input, sampler)
 
 
 def process_output_func(output_folder=None, return_values=None):
     if return_values is not None:
-        _, runner, upd_input, sampler = return_values
+        runner, upd_input, sampler = return_values
         sampler_products = sampler.products(
             to_getdist=True, combined=True, skip_samples=0.33)
         sample = sampler_products["sample"]
@@ -104,8 +106,8 @@ def process_output_func(output_folder=None, return_values=None):
     runner.plot_progress()
     # Create a "logpost" derived parameter with the **logposterior**
     sample.addDerived(-sample.loglikes, "logpost")
-    products = {"sampler": "gpry", "samples": sample}
+    results = {"sampler": "gpry", "samples": sample}
     if logZ is not None:
-        products.update({"logZ": logZ, "logZstd": logZstd})
-    products["logp_func"] = lambda x: runner.gpr.predict(np.atleast_2d(x))
-    return products
+        results.update({"logZ": logZ, "logZstd": logZstd})
+    results["logp_func"] = lambda x: runner.gpr.predict(np.atleast_2d(x))
+    return results
