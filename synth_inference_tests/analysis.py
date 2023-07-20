@@ -24,20 +24,23 @@ def create_table(output_folder):
     columns = list(rows[0])
     table_dict = {col: [row.get(col, None) for row in rows] for col in columns}
     table = pd.DataFrame(table_dict)
+    col_parallel = "(MPI, threads)"
+    table["(MPI, threads)"] = [
+        (m, t) for _, (m, t)
+        in table[["n_processes", "n_threads_per_process"]].iterrows()]
     first_columns = [
         # PDF
         "pdf",
         "dim",
         # Environment
-        "n_processes",
-        "n_threads_per_process",
+        "(MPI, threads)",
         # Result
         "end_state",
         "n_truth",
         "time_overhead"
         ]
     last_columns = ["notes"]
-    ignore_columns = ["time_truth"]
+    ignore_columns = ["time_truth", "n_processes", "n_threads_per_process"]
     new_columns_order = [col for col in first_columns if col in table.columns]
     new_columns_order += [col for col in table.columns if col not in new_columns_order]
     new_columns_order = [col for col in new_columns_order
