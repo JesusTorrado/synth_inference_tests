@@ -72,8 +72,12 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
         return results if is_main_process else None
     # Compute/process necessary quantities for the report, do sampler-internal plots, etc.
     mpi_comm.barrier()
-    sampler_results = process_output_func(
-        output_folder=products_folder, return_values=return_values)
+    try:
+        sampler_results = process_output_func(
+            output_folder=products_folder, return_values=return_values)
+    except Exception as excpt:
+        print(f"Error processing output: {excpt}")
+        return results if is_main_process else None
     mpi_comm.barrier()
     # Do our side of the tests and plots
     if is_main_process:
