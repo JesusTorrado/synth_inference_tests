@@ -97,6 +97,4 @@ class LogGammaMix(PDF):
 
     @property
     def logZ(self):
-        logZ = 0
-        logZ += -np.sum(np.log(self.bounds.T[1] - self.bounds.T[0]))
-        return logZ
+        return self.logprior_density

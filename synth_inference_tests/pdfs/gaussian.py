@@ -29,8 +29,9 @@ class Gaussian(PDF):
         self.prior_size_in_std = prior_size_in_std
         self.random_mean_in_std = random_mean_in_std
         self.draw(rng=rng)
-        self.bounds = np.array([-self.prior_size_in_std * self.std,
-                                self.prior_size_in_std * self.std]).T
+        # Ensure the Gaussian is fully contained
+        self.bounds = np.array([self.mean - self.prior_size_in_std * self.std,
+                                self.mean + self.prior_size_in_std * self.std]).T
 
     def draw(self, rng=None):
         if is_main_process:
@@ -67,3 +68,9 @@ class Gaussian(PDF):
         i_not_too_high = np.logical_and.reduce((samples < self.bounds[:, 1]).T)
         samples = samples[np.logical_and(i_not_too_low, i_not_too_high)]
         return samples
+
+    @property
+    def logZ(self):
+        if self.prior_size_in_std < 5:
+            return None
+        return self.logprior_density

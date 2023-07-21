@@ -44,7 +44,7 @@ class Funnel(PDF):
         params = np.atleast_2d(params)
         x1 = params[:, 0]
         covs = np.exp(x1)[:, np.newaxis, np.newaxis] * self.corr_rest
-        return (self.dim * np.log(20) + self.rv_1.logpdf(x1) +
+        return (self.rv_1.logpdf(x1) +
                 np.array([multivariate_normal.logpdf(p, mean=self.mean_rest, cov=cov)
                           for p, cov in zip(params[:, 1:], covs)]))
 
@@ -66,7 +66,4 @@ class Funnel(PDF):
 
     @property
     def logZ(self):
-        logZ = 0  # if prior is [-10, 10], corrected in next step
-        logZ += np.sum(np.log(20 * np.ones(self.dim)))
-        logZ += -np.sum(np.log(self.bounds.T[1] - self.bounds.T[0]))
-        return logZ
+        return self.logprior_density
