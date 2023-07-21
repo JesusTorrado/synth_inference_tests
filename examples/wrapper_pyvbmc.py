@@ -95,9 +95,15 @@ def process_output_func(output_folder=None, return_values=None):
         os.makedirs(plots_folder)
     except FileExistsError:
         pass
-    vp.plot(plot_data=True, plot_vp_centres=True)
-    import matplotlib.pyplot as plt
-    plt.savefig(os.path.join(plots_folder, "vp.png"))
+    try:
+        vp.plot(plot_data=True, plot_vp_centres=True)
+        import matplotlib.pyplot as plt
+        plt.savefig(os.path.join(plots_folder, "vp.png"))
+    except Exception as excpt:
+        msg = f"ERROR: Could not produce plot: {excpt}"
+        print(msg)
+        with open(os.path.join(plots_folder, "error.txt"), "w") as f:
+            f.write(msg + "\n")
     results = {"samples": gdsample}
     # NB: logZ here are ELBO's!
     results["logZ"] = sampler_results["elbo"]
