@@ -58,7 +58,8 @@ class Gaussian(PDF):
         return mean, cov, stds
 
     def logp(self, params):
-        return self.rv.logpdf(params)
+        # We subtract the prior density here so that the evidence is 1
+        return self.rv.logpdf(params) - self.logprior_density
 
     def samples(self, n=None):
         if n is None:
@@ -72,5 +73,5 @@ class Gaussian(PDF):
     @property
     def logZ(self):
         if self.prior_size_in_std < 5:
-            return None
-        return self.logprior_density
+            return None  # cannot be known because part of the mode may be out of bounds
+        return 0

@@ -109,8 +109,10 @@ def process_output_func(output_folder=None, return_values=None):
             f.write(msg + "\n")
     results = {"samples": gdsample}
     # NB: logZ here are ELBO's!
-    results["logZ"] = float(sampler_results["elbo"])
+    # Needs correction for (uniform) log-prior density, which is ignored by pyvbmc
+    logprior_density = -np.sum(np.log(bounds.T[1] - bounds.T[0]))
+    results["logZ"] = float(sampler_results["elbo"]) + logprior_density
     results["logZstd"] = float(sampler_results["elbo_sd"])
     results["logp_func"] = lambda X: vp.log_pdf(X).T[0]
-    results["notes"] = "logZ is an ELBO"
+    results["notes"] = "logZ is ELBO"
     return results
