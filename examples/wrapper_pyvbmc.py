@@ -44,7 +44,7 @@ def run_func(logpdf, bounds, output_folder=None,
         vp, products = vbmc.optimize()
     except Exception as excpt:
         warn(f"pyVBMC finished with an error: {excpt}")
-        return "e", None, None, None, None, None
+        return "e", None
     print("VBMC done!")
     if products["func_count"] >= budget:
         results["end_state"] = "b"
