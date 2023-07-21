@@ -8,6 +8,7 @@ from pyvbmc import VBMC
 
 from synth_inference_tests.get_pdf import get_pdf
 from synth_inference_tests.run import run as test_run
+from synth_inference_tests.mpi import multiple_processes
 
 finite_minus_inf = -1e8  # cannot be too small, or pyVBMC crashes
 pyvbmc_obj_filename = "vbmc.pkl"
@@ -30,6 +31,8 @@ def load_sample(output_folder):
 
 def run_func(logpdf, bounds, output_folder=None,
              budget=None, budget_count_inf=False, budget_count_parallel=False):
+    if multiple_processes:
+        raise NotImplementedError("MPI parallelization not implemented for pyVBMC")
     results = {"sampler": "pyvbmc"}
     LB, UB = bounds.T
     x0 = LB + (UB - LB) / 2

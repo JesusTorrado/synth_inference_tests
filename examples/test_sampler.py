@@ -6,6 +6,7 @@ import numpy as np
 
 from synth_inference_tests.get_pdf import get_pdfs
 from synth_inference_tests.run import run as test_run
+from synth_inference_tests.mpi import is_main_process
 
 
 def get_wrapper(sampler_name):
@@ -35,18 +36,21 @@ if __name__ == "__main__":
     n_realisations = {pdf.NameDim: 0 for pdf in pdfs}
     for pdf in pdfs:
         n_realisations[pdf.NameDim] += 1
-        msg = f"*** Sampling from pdf {pdf.NameDim} #{n_realisations[pdf.NameDim]} " + \
-             " " * 40 + "*" * 3
-        print("\n" + "*" * len(msg) + "\n" + msg + "\n" + "*" * len(msg) + "\n")
+        if is_main_process:
+            msg = (f"*** Sampling from pdf {pdf.NameDim} #{n_realisations[pdf.NameDim]} "
+                   + " " * 40 + "*" * 3)
+            print("\n" + "*" * len(msg) + "\n" + msg + "\n" + "*" * len(msg) + "\n")
         output_folder = os.path.join("output_" + sampler_name,
                                      pdf.NameDim + "_" + str(n_realisations[pdf.NameDim]))
-        try:
-            os.makedirs(output_folder)
-        except FileExistsError:
-            pass
+        if is_main_process:
+            try:
+                os.makedirs(output_folder)
+            except FileExistsError:
+                pass
         results = test_run(
             pdf, run_func, process_output_func, output_folder=output_folder,
             i=n_realisations[pdf.NameDim])
-        print("\n----RESULTS----\n")
-        pprint(results)
-        print()
+        if is_main_process:
+            print("\n----RESULTS----\n")
+            pprint(results)
+            print()

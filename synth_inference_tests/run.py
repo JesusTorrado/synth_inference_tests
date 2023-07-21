@@ -35,14 +35,16 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
             "n_processes": mpi_size,
             "n_threads_per_process": get_num_threads(),
         }
-    if i is not None:
-        results["i"] = i
+        if i is not None:
+            results["i"] = i
     # Run external sampler
+    mpi_comm.barrier()
     start_total = time()
     results_upd, return_values = run_func(
         pdf.logpdf, pdf.bounds, output_folder=products_folder,
         budget=None, budget_count_inf=False, budget_count_parallel=False)
     delta_total = time() - start_total
+    mpi_comm.barrier()
     # Timings and # evals
     time_pdf = mpi_comm.gather(pdf.t)
     n_evals_pdf = mpi_comm.gather(pdf.n)
@@ -54,7 +56,7 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
             "n_truth": max(n_evals_pdf),
             "time_overhead": max(time_overhead),
         })
-    end_state = results.get("end_state")
+    end_state = mpi_comm.bcast(results.get("end_state") if is_main_process else None)
     if not isinstance(end_state, str) or \
        not end_state.lower() in ["c", "b", "e", "?"]:
         raise ValueError("'end_state' must be one of 'c' (converged), 'b' "
@@ -62,51 +64,53 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
     # NB: 'c' means *spontaneous* stop. If budget exhausted and convergence judged likely
     #     by internal diagnostics, that's still 'b'.
     if end_state == "?":
-        print("The sampler has finished with unknown end state.")
+        if is_main_process:
+            print("The sampler has finished with unknown end state.")
     elif end_state == 'e':
-        dump_result(results, output_folder)
-        return results
-
+        if is_main_process:
+            dump_result(results, output_folder)
+        return results if is_main_process else None
     # Compute/process necessary quantities for the report, do sampler-internal plots, etc.
+    mpi_comm.barrier()
     sampler_results = process_output_func(
         output_folder=products_folder, return_values=return_values)
-    results.update(sampler_results)
-
-    # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
-    # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
-    sample_orig = results.pop("samples")
-    sample_ref = pdf.samples()
-    logp_func = results.pop("logp_func", None)
-    if sample_ref is not None and logp_func is not None:
-        sampled_params = [
-            p.name for p in sample_orig.getParamNames().names
-            if not p.isDerived]
-        sample = np.array([sample_orig[p] for p in sampled_params]).T
-        weights = sample_orig.weights
-        # This is a log-posterior sample, not a log-likelihood,
-        sample_logp = sample_orig["logpost"]
-        # so the reference pdf must be the logposterior too!
-        sample_logp_ref = pdf.logpost(sample)
-        sample_ref_logp_ref = pdf.logpost(sample_ref)
-        sample_ref_logp = logp_func(sample_ref)
-        results["kl"] = float(kl_sym(sample, sample_logp, sample_logp_ref,
-                                    sample_ref, sample_ref_logp_ref, sample_ref_logp,
-                                    weights_1=weights))
-        results["kl_norm"] = float(kl_norm_sym(
-            np.average(sample, weights=weights, axis=0),
-            np.cov(sample.T, aweights=weights),
-            np.average(sample_ref, axis=0), np.cov(sample_ref.T)))
-
-    # Evidence
-    results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
-
-    # Save results object
-    dump_result(results, output_folder)
-
+    mpi_comm.barrier()
+    # Do our side of the tests and plots
+    if is_main_process:
+        results.update(sampler_results)
+        # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
+        # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
+        sample_orig = results.pop("samples")
+        sample_ref = pdf.samples()
+        logp_func = results.pop("logp_func", None)
+        if sample_ref is not None and logp_func is not None:
+            sampled_params = [
+                p.name for p in sample_orig.getParamNames().names
+                if not p.isDerived]
+            sample = np.array([sample_orig[p] for p in sampled_params]).T
+            weights = sample_orig.weights
+            # This is a log-posterior sample, not a log-likelihood,
+            sample_logp = sample_orig["logpost"]
+            # so the reference pdf must be the logposterior too!
+            sample_logp_ref = pdf.logpost(sample)
+            sample_ref_logp_ref = pdf.logpost(sample_ref)
+            sample_ref_logp = logp_func(sample_ref)
+            results["kl"] = float(kl_sym(sample, sample_logp, sample_logp_ref,
+                                         sample_ref, sample_ref_logp_ref, sample_ref_logp,
+                                         weights_1=weights))
+            results["kl_norm"] = float(kl_norm_sym(
+                np.average(sample, weights=weights, axis=0),
+                np.cov(sample.T, aweights=weights),
+                np.average(sample_ref, axis=0), np.cov(sample_ref.T)))
+        # Evidence
+        results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
+        # Save results object
+        dump_result(results, output_folder)
     # Plots
     if is_main_process:
         plot_triangle(sample_orig, pdf=pdf, output_folder=plots_folder)
-    return results
+    return results if is_main_process else None
+
 
 def dump_result(result, output_folder):
     with open(os.path.join(output_folder, result_file), "w") as f:

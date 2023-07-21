@@ -7,6 +7,7 @@ from getdist.mcsamples import loadMCSamples
 
 from synth_inference_tests.get_pdf import get_pdf
 from synth_inference_tests.run import run as test_run
+from synth_inference_tests.mpi import is_main_process
 
 
 def cobaya_model_input(loglikelihood, bounds, paramnames=None):
@@ -77,6 +78,8 @@ def run_func(logpdf, bounds, output_folder=None,
 
 
 def process_output_func(output_folder=None, return_values=None):
+    if not is_main_process:
+        return None
     if return_values is not None:
         upd_input, sampler = return_values
         products = sampler.products(
