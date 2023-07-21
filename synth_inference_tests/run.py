@@ -53,7 +53,8 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
         results.update(results_upd)
         results.update({
             "time_truth": max(time_pdf),
-            "n_truth": max(n_evals_pdf),
+            "n_truth": sum(n_evals_pdf),
+            "n_truth_max_process": max(n_evals_pdf),
             "time_overhead": max(time_overhead),
         })
     end_state = mpi_comm.bcast(results.get("end_state") if is_main_process else None)

@@ -36,7 +36,7 @@ def create_table(output_folder):
         # Convergence and results
         "end_state", "kl", "kl_norm", "logZ", "logZstd", "logZ_truth",
         # Efficiency
-         "n_truth", "time_overhead",
+        "time_overhead", "n_truth", "n_truth_max_process",
         ]
     last_columns = ["notes"]
     ignore_columns = ["time_truth", "n_processes", "n_threads_per_process"]
