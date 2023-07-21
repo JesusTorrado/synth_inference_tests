@@ -106,8 +106,8 @@ def process_output_func(output_folder=None, return_values=None):
             f.write(msg + "\n")
     results = {"samples": gdsample}
     # NB: logZ here are ELBO's!
-    results["logZ"] = sampler_results["elbo"]
-    results["logZstd"] = sampler_results["elbo_sd"]
+    results["logZ"] = float(sampler_results["elbo"])
+    results["logZstd"] = float(sampler_results["elbo_sd"])
     results["logp_func"] = lambda X: vp.log_pdf(X).T[0]
     results["notes"] = "logZ is an ELBO"
     return results
