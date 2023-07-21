@@ -4,6 +4,8 @@ Builds the pdf database and retrieves one or more pdf's based on some dimensiona
 
 import os
 from inspect import isclass
+from itertools import chain
+
 import yaml
 from numpy.random import default_rng
 
@@ -64,6 +66,9 @@ def get_pdfs(pdf_or_file_name):
         except FileNotFoundError as excpt:
             raise FileNotFoundError(f"PDFs file {pdf_or_file_name} not found.") from excpt
         rng = default_rng(seed=pdfs_dict.pop("seed", None))
-        return [get_pdf(pdf_name, rng=rng) for pdf_name in pdfs_dict]
+        pdfs = [[get_pdf(pdf_name, rng=rng) for _ in range(n or 1)]
+                for pdf_name, n in pdfs_dict.items()]
+        pdfs = list(chain(*pdfs))  # flatten list
+        return pdfs
     else:  # is pdf name
         return [get_pdf(pdf_or_file_name)]

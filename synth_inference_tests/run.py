@@ -12,7 +12,7 @@ from .utils import kl_sym, kl_norm_sym
 result_file = "result.yaml"
 
 
-def run(pdf, run_func, process_output_func, output_folder,
+def run(pdf, run_func, process_output_func, output_folder, i=None,
         budget=None, budget_count_inf=False, budget_count_parallel=False):
     """
     run_func: callable
@@ -35,6 +35,8 @@ def run(pdf, run_func, process_output_func, output_folder,
             "n_processes": mpi_size,
             "n_threads_per_process": get_num_threads(),
         }
+    if i is not None:
+        results["i"] = i
     # Run external sampler
     start_total = time()
     results_upd, return_values = run_func(

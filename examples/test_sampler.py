@@ -32,16 +32,21 @@ if __name__ == "__main__":
     run_func, process_output_func = get_wrapper(sampler_name)
     # Build PDF (or list of them)
     pdfs = get_pdfs(sys.argv[2])
+    n_realisations = {pdf.NameDim: 0 for pdf in pdfs}
     for pdf in pdfs:
-        msg = f"*** Sampling from pdf {pdf.NameDim} " + "*" * 50
+        n_realisations[pdf.NameDim] += 1
+        msg = f"*** Sampling from pdf {pdf.NameDim} #{n_realisations[pdf.NameDim]} " + \
+             " " * 40 + "*" * 3
         print("\n" + "*" * len(msg) + "\n" + msg + "\n" + "*" * len(msg) + "\n")
-        output_folder = os.path.join("output_" + sampler_name, pdf.NameDim)
+        output_folder = os.path.join("output_" + sampler_name,
+                                     pdf.NameDim + "_" + str(n_realisations[pdf.NameDim]))
         try:
             os.makedirs(output_folder)
         except FileExistsError:
             pass
-        results = test_run(pdf, run_func, process_output_func,
-                           output_folder=output_folder)
+        results = test_run(
+            pdf, run_func, process_output_func, output_folder=output_folder,
+            i=n_realisations[pdf.NameDim])
         print("\n----RESULTS----\n")
         pprint(results)
         print()

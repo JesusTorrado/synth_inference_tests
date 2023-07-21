@@ -91,8 +91,9 @@ def process_output_func(output_folder=None, return_values=None):
         sampler_products = sampler.products(
             to_getdist=True, combined=True, skip_samples=0.33)
         sample = sampler_products["sample"]
-        logZ = sampler_products.get("logZ")
-        logZstd = sampler_products.get("logZstd")
+        float_if_not_None = lambda x: float(x) if x is not None else None
+        logZ = float_if_not_None(sampler_products.get("logZ"))
+        logZstd = float_if_not_None(sampler_products.get("logZstd"))
         runner.plot_mc(upd_input, sampler, add_training=True)
         runner.plot_distance_distribution(upd_input, sampler, show_added=True)
     elif output_folder is not None:
