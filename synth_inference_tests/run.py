@@ -75,8 +75,12 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
     try:
         sampler_results = process_output_func(
             output_folder=products_folder, return_values=return_values)
+        processing_success = True
     except Exception as excpt:
         print(f"Error processing output: {excpt}")
+        processing_success = False  # only MPI rank 0 ever gets here
+    processing_success = mpi_comm.bcast(processing_success)
+    if not processing_success:
         return results if is_main_process else None
     mpi_comm.barrier()
     # Do our side of the tests and plots
