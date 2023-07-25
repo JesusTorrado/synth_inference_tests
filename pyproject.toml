@@ -1,0 +1,6 @@
+[project]
+name = "synth_inference_tests"
+version = "0.5"
+
+[tool.setuptools.package-data]
+synth_inference_tests = ["pdfs/data/*.json"]

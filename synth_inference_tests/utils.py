@@ -61,7 +61,7 @@ def invCDFinterp(xs, pdf_func, pdf_args=None, splrep_kwargs=None):
     Uses ``scipy.interpolate.splrep`` to create an interpolator. Use ``splrep_kwargs`` to
     pass keyword arguments to it, e.g. ``{"k": 1}``.
 
-    Returns a tuple of the the CDF samples and the interpolator.
+    Returns a tuple of the ``(CDF, x)`` samples and the interpolator.
     """
     quad_kwargs = {"args": pdf_args} if pdf_args else {}
     CDF = np.array(
@@ -92,4 +92,4 @@ def invCDFinterp(xs, pdf_func, pdf_args=None, splrep_kwargs=None):
     first_one = next(i for i, CDFi in enumerate(CDF) if np.isclose(CDFi, 1))
     CDF = CDF[:first_one + 1]
     xs = xs[:first_one + 1]
-    return (CDF, interpolate.splrep(CDF, xs, **(splrep_kwargs or {})))
+    return (CDF, xs, interpolate.splrep(CDF, xs, **(splrep_kwargs or {})))
