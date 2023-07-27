@@ -17,11 +17,9 @@ from scipy import interpolate
 from functools import partial
 
 from ..pdf import PDF
-from ..utils import invCDFinterp
+from ..utils import invCDFinterp, path_data
 
-path_loggamma_interp_data = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)),
-    "data", "loggamma.json")
+path_loggamma_interp_data = os.path.join(path_data, "loggamma.json")
 
 
 def logp_loggamma(x, alpha, mu, sigma):

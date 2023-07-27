@@ -6,9 +6,12 @@ Difficulty: pronounced curving degeneracies.
 
 """
 
+import os
+from warnings import warn
 import numpy as np
 
 from ..pdf import PDF
+from ..utils import path_data
 
 
 class Rosenbrock(PDF):
@@ -32,4 +35,13 @@ class Rosenbrock(PDF):
             axis=-1)
 
     def samples(self, n=None):
-        pass
+        try:
+            samples = np.load(os.path.join(path_data, self.NameDim + ".npy"))
+        except FileNotFoundError:
+            warn(f"Samples not precomputed for Rosenbrock with dim {self.dim}.")
+            return None
+        if n is not None:
+            warn("Ignoring the number of samples requested, since it is a precomputed "
+                 "weighted sample.")
+        warn(f"Returning samples weights as first column of the table.")
+        return samples

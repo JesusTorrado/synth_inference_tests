@@ -1,7 +1,11 @@
+import os
 import numpy as np
 from numpy.linalg import det
 from scipy import integrate
 from scipy import interpolate
+
+
+path_data = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pdfs", "data")
 
 
 def kl_sym(sample_1, logp_sample_1, logp_2_sample_1,

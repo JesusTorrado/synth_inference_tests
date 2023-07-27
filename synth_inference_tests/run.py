@@ -91,6 +91,11 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
         # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
         sample_orig = results.pop("samples")
         sample_ref = pdf.samples()
+        if sample_ref.shape[1] == pdf.dim + 1:
+            weights_ref = sample_ref[:, 0]
+            sample_ref = sample_ref[:, 1:]
+        else:
+            weights_ref = None
         logp_func = results.pop("logp_func", None)
         if sample_ref is not None and logp_func is not None:
             sampled_params = [
@@ -106,11 +111,12 @@ def run(pdf, run_func, process_output_func, output_folder, i=None,
             sample_ref_logp = logp_func(sample_ref)
             results["kl"] = float(kl_sym(sample, sample_logp, sample_logp_ref,
                                          sample_ref, sample_ref_logp_ref, sample_ref_logp,
-                                         weights_1=weights))
+                                         weights_1=weights, weights_2=weights_ref))
             results["kl_norm"] = float(kl_norm_sym(
                 np.average(sample, weights=weights, axis=0),
                 np.cov(sample.T, aweights=weights),
-                np.average(sample_ref, axis=0), np.cov(sample_ref.T)))
+                np.average(sample_ref, axis=0, aweights=weights),
+                np.cov(sample_ref.T, aweights=weights_ref)))
         # Evidence
         results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
         # Save results object
@@ -145,6 +151,8 @@ def plot_triangle(sample, output_folder, filename="triangle.png", pdf=None,
     paramnames = sampled_paramnames + ["logpost"]
     if pdf is not None:
         truth_sample = pdf.samples()
+        if truth_sample.shape[1] == pdf.dim + 1:
+            truth_weights, truth_sample = truth_sample[:, 0], truth_sample[:, 1:]
         if truth_sample is not None:
             from getdist.mcsamples import MCSamples
             kwargs = {"names": sampled_paramnames}
