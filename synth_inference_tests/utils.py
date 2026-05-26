@@ -8,6 +8,12 @@ from scipy import interpolate
 path_data = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pdfs", "data")
 
 
+def create_path(path):
+    """Creates the folder path ``path`` if it does not exist."""
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
 def kl_sym(sample_1, logp_sample_1, logp_2_sample_1,
            sample_2, logp_sample_2, logp_1_sample_2, weights_1=None, weights_2=None):
     """
