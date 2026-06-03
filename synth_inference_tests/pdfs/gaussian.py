@@ -4,7 +4,7 @@ Random Gaussian pdf's from GPry ("Fast and robust Bayesian Inference using Gauss
 
 import numpy as np
 from numpy.random import default_rng
-from scipy.stats import multivariate_normal, random_correlation
+from scipy.stats import multivariate_normal, random_correlation  # type: ignore
 
 from ..pdf import PDF
 from ..mpi import is_main_process, multiple_processes, mpi_comm
@@ -23,20 +23,28 @@ class Gaussian(PDF):
     nongaussian = 0
     random = True
 
-    def __init__(self, dim, rng=None, prior_size_in_std=_prior_size_in_std,
-                 random_mean_in_std=_default_random_mean_in_std):
+    def __init__(
+        self,
+        dim,
+        rng=None,
+        prior_size_in_std=_prior_size_in_std,
+        random_mean_in_std=_default_random_mean_in_std,
+    ):
         super().__init__(dim)
         self.prior_size_in_std = prior_size_in_std
         self.random_mean_in_std = random_mean_in_std
         self.draw(rng=rng)
         # Ensure the Gaussian is fully contained
-        self.bounds = np.array([self.mean - self.prior_size_in_std * self.std,
-                                self.mean + self.prior_size_in_std * self.std]).T
+        prior_half_range = self.prior_size_in_std * self.std
+        self.bounds = np.array(
+            [self.mean - prior_half_range, self.mean + prior_half_range]
+        ).T
 
     def draw(self, rng=None):
         if is_main_process:
             self.mean, self.cov, self.std = self.draw_mean_cov(
-                self.dim, rng=rng, random_mean_in_std=_default_random_mean_in_std)
+                self.dim, rng=rng, random_mean_in_std=_default_random_mean_in_std
+            )
         if multiple_processes:
             for attr in ["mean", "cov", "std"]:
                 setattr(self, attr, mpi_comm.bcast(getattr(self, attr, None)))
@@ -54,7 +62,7 @@ class Gaussian(PDF):
         eigs = eigs / np.sum(eigs) * dim
         corr = random_correlation.rvs(eigs) if dim > 1 else [[1]]
         cov = np.multiply(np.outer(stds, stds), corr)
-        mean = rng.uniform(low=-1., size=dim) * stds * random_mean_in_std
+        mean = rng.uniform(low=-1.0, size=dim) * stds * random_mean_in_std
         return mean, cov, stds
 
     def logp(self, params):

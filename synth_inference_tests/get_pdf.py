@@ -57,17 +57,21 @@ def get_pdf(name, dim=None, rng=None, tags=None):
 
 def get_pdfs(pdf_or_file_name):
     """
-    Retrieves pdfs from an input yaml file (as keys).
+    Retrieves pdfs from an input yaml file (as keys). Returns instances.
     """
     if os.path.splitext(pdf_or_file_name)[1]:
         try:
             with open(pdf_or_file_name, "r") as f:
                 pdfs_dict = yaml.safe_load(f)
         except FileNotFoundError as excpt:
-            raise FileNotFoundError(f"PDFs file {pdf_or_file_name} not found.") from excpt
+            raise FileNotFoundError(
+                f"PDFs file {pdf_or_file_name} not found."
+            ) from excpt
         rng = default_rng(seed=pdfs_dict.pop("seed", None))
-        pdfs = [[get_pdf(pdf_name, rng=rng) for _ in range(n or 1)]
-                for pdf_name, n in pdfs_dict.items()]
+        pdfs = [
+            [get_pdf(pdf_name, rng=rng) for _ in range(n or 1)]
+            for pdf_name, n in pdfs_dict.items()
+        ]
         pdfs = list(chain(*pdfs))  # flatten list
         return pdfs
     else:  # is pdf name

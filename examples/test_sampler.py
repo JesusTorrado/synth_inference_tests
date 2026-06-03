@@ -2,7 +2,7 @@ import os
 import sys
 from importlib import import_module
 from pprint import pprint
-import numpy as np
+import yaml
 
 from synth_inference_tests.get_pdf import get_pdfs
 from synth_inference_tests.run import run as test_run
@@ -14,42 +14,65 @@ def get_wrapper(sampler_name):
     try:
         wrapper = import_module(wrapper_name)
     except ModuleNotFoundError as excpt:
-        raise ValueError(f"No wrapper {wrapper_name}.py found for {sampler_name}.") \
-            from excpt
+        raise ValueError(
+            f"No wrapper {wrapper_name}.py found for {sampler_name}."
+        ) from excpt
     try:
         run_func = wrapper.run_func
         process_output_func = wrapper.process_output_func
     except AttributeError as excpt:
-        raise ValueError("The wrapper should contain two functions: 'run_func' and "
-                         "'process_output_func' (see documentation).") from excpt
+        raise ValueError(
+            "The wrapper should contain two functions: 'run_func' and "
+            "'process_output_func' (see documentation)."
+        ) from excpt
     return run_func, process_output_func
 
 
 if __name__ == "__main__":
-    if len(sys.argv[1:]) != 2:
-        raise ValueError("Pass a valid sampler and a likelihood name as first and second "
-                         "arg, e.g. 'gpry gaussian5'")
+    if 3 < len(sys.argv[1:]) < 2:
+        raise ValueError(
+            "Pass a valid sampler and likelihood name as first twi args, e.g. 'cobaya "
+            "gaussian5', and (optionally) a .yaml file for sampler configuration as last "
+            "argument"
+        )
+    use_budget = False
+    # Prepare sampler
     sampler_name = sys.argv[1].lower()
     run_func, process_output_func = get_wrapper(sampler_name)
+    sampler_kwargs = sys.argv[3] if len(sys.argv) >= 4 else None
+    if sampler_kwargs is not None:
+        with open(sampler_kwargs, "r") as f:
+            sampler_kwargs = yaml.safe_load(f)
     # Build PDF (or list of them)
     pdfs = get_pdfs(sys.argv[2])
     n_realisations = {pdf.NameDim: 0 for pdf in pdfs}
     for pdf in pdfs:
         n_realisations[pdf.NameDim] += 1
         if is_main_process:
-            msg = (f"*** Sampling from pdf {pdf.NameDim} #{n_realisations[pdf.NameDim]} "
-                   + " " * 40 + "*" * 3)
+            msg = (
+                f"*** Sampling from pdf {pdf.NameDim} #{n_realisations[pdf.NameDim]} "
+                + " " * 40
+                + "*" * 3
+            )
             print("\n" + "*" * len(msg) + "\n" + msg + "\n" + "*" * len(msg) + "\n")
-        output_folder = os.path.join("output_" + sampler_name,
-                                     pdf.NameDim + "_" + str(n_realisations[pdf.NameDim]))
+        output_folder = os.path.join(
+            "output_" + sampler_name,
+            pdf.NameDim + "_" + str(n_realisations[pdf.NameDim]),
+        )
         if is_main_process:
             try:
                 os.makedirs(output_folder)
             except FileExistsError:
                 pass
         results = test_run(
-            pdf, run_func, process_output_func, output_folder=output_folder,
-            i=n_realisations[pdf.NameDim])
+            pdf,
+            run_func,
+            process_output_func,
+            output_folder=output_folder,
+            i=n_realisations[pdf.NameDim],
+            budget=use_budget,
+            sampler_kwargs=sampler_kwargs,
+        )
         if is_main_process:
             print("\n----RESULTS----\n")
             pprint(results)

@@ -44,9 +44,15 @@ class Funnel(PDF):
         params = np.atleast_2d(params)
         x1 = params[:, 0]
         covs = np.exp(x1)[:, np.newaxis, np.newaxis] * self.corr_rest
-        return (self.rv_1.logpdf(x1) +
-                np.array([multivariate_normal.logpdf(p, mean=self.mean_rest, cov=cov)
-                          for p, cov in zip(params[:, 1:], covs)]))
+        return (
+            self.rv_1.logpdf(x1)
+            + np.array(
+                [
+                    multivariate_normal.logpdf(p, mean=self.mean_rest, cov=cov)
+                    for p, cov in zip(params[:, 1:], covs)
+                ]
+            )
+        )[0]
 
     def samples(self, n=None):
         if n is None:
@@ -56,7 +62,8 @@ class Funnel(PDF):
         # Trick: remove exp(x_1) factor by transforming back to Norm(0, corr_rest),
         #        and then multiply. Easier to vectorize.
         corr_samples = multivariate_normal.rvs(
-            size=n, mean=self.mean_rest, cov=self.corr_rest)
+            size=n, mean=self.mean_rest, cov=self.corr_rest
+        )
         transf_factor = np.exp(0.5 * sample[:, 0])
         if self.dim == 2:
             sample[:, 1] = corr_samples * transf_factor
