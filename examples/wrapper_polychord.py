@@ -47,7 +47,8 @@ def run_func(
     for p, v in settings.items():
         if isinstance(v, str):
             if v.endswith("d"):
-                v = int(v.removesuffix("d")) * dim
+                v = v.removesuffix("d")
+                v = int(v or 1) * dim  # 'or 1' handles v="d"
             else:
                 v = int(v)
         setattr(polychord_settings, p, v)
