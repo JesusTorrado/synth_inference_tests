@@ -52,7 +52,7 @@ class Funnel(PDF):
                     for p, cov in zip(params[:, 1:], covs)
                 ]
             )
-        )[0]
+        ) - self.logprior_density
 
     def samples(self, n=None):
         if n is None:
@@ -73,4 +73,4 @@ class Funnel(PDF):
 
     @property
     def logZ(self):
-        return self.logprior_density
+        return 0  # we have subtracted the prior log-density in the likelihood
