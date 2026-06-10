@@ -1,9 +1,11 @@
 import os
 import sys
+
+import yaml  # type: ignore
 import numpy as np
 
-from cobaya.run import run as cobaya_run
-from getdist.mcsamples import loadMCSamples
+from cobaya.run import run as cobaya_run  # type: ignore
+from getdist.mcsamples import loadMCSamples  # type: ignore
 
 from synth_inference_tests.get_pdf import get_pdf
 from synth_inference_tests.run import run as test_run
@@ -35,32 +37,48 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     else:
         assert len(paramnames) == dim, (
             "If paramnames given, it must have as many parameters as the dimensionality "
-            f"specified with 'bounds': {dim}.")
-    info = {"params": {p: {"prior": list(b)} for p, b in zip(paramnames, bounds)}}
+            f"specified with 'bounds': {dim}."
+        )
+    info = {
+        "params": {
+            p: {
+                "prior": list(b),
+            }
+            for p, b in zip(paramnames, bounds)
+        }
+    }
 
     # NB: `logp` methods in this package have unnamed args, which Cobaya does not support.
     # We need to create a wrapper with named args.
     def lkl(**kwargs):
         return loglikelihood(list(kwargs.values()))
 
-    info.update({"likelihood": {"test": {
-        "external": lkl, "requires": {},
-        "input_params": paramnames
-    }}})
-
-    # info["timing"] = True
-    # info["debug"] = True
-
+    info.update(
+        {
+            "likelihood": {
+                "test": {"external": lkl, "requires": {}, "input_params": paramnames}
+            }
+        }
+    )
     return info
 
 
-def run_func(logpdf, bounds, output_folder=None,
-                    budget=None, budget_count_inf=False, budget_count_parallel=False):
+def run_func(
+    logpdf,
+    bounds,
+    output_folder=None,
+    budget=None,
+    budget_count_inf=False,
+    budget_count_parallel=False,
+    sampler_kwargs=None,
+):
     input_dict = cobaya_model_input(logpdf, bounds, paramnames=None)
-#    input_dict["sampler"] = {"mcmc": {"measure_speeds": False}}
-    input_dict["sampler"] = {"polychord": {"measure_speeds": False}}
-
-    results = {"sampler": f"cobaya:{list(input_dict['sampler'].keys())[0]}"}
+    input_dict["sampler"] = sampler_kwargs or {"mcmc": None}
+    sampler = list(input_dict["sampler"].keys())[0]
+    input_dict["sampler"][sampler] = input_dict["sampler"][sampler] or {}
+    # For now (no pdfs with param hierarchy), disable speed measurement
+    input_dict["sampler"][sampler]["measure_speeds"] = False
+    results = {"sampler": f"cobaya:{sampler}"}
     if not output_folder.endswith(r"\\"):
         output_folder = output_folder + "/"
     input_dict["output"] = output_folder
@@ -70,20 +88,16 @@ def run_func(logpdf, bounds, output_folder=None,
     except Exception:
         results["end_state"] = "e"
         return results, None
-
-    # TODO: for now budget not managed
     results["end_state"] = "c"
-
     return results, (upd_input, sampler)
 
 
-def process_output_func(output_folder=None, return_values=None):
+def process_output_func(return_values, output_folder=None):
     if not is_main_process:
         return None
     if return_values is not None:
         upd_input, sampler = return_values
-        products = sampler.products(
-            to_getdist=True, combined=True, skip_samples=0.33)
+        products = sampler.products(to_getdist=True, combined=True, skip_samples=0.33)
         sample = products["sample"]
         logZ = products.get("logZ")
         logZstd = products.get("logZstd")
@@ -97,7 +111,34 @@ def process_output_func(output_folder=None, return_values=None):
         logZ = None
     # Create a "logpost" derived parameter with the **logposterior**
     sample.addDerived(-sample.loglikes, "logpost")
-    results ={"samples": sample}
+    results = {"samples": sample}
     if logZ is not None:
         results.update({"logZ": logZ, "logZstd": logZstd})
     return results
+
+
+# Runnable as a script, just for tests
+if __name__ == "__main__":
+    # Build PDF
+    if 2 < len(sys.argv[1:]) < 1:
+        raise ValueError(
+            "Pass likelihood name as first arg, e.g. 'gaussian5', and (optionally) "
+            "a .yaml file for sampler configuration as 2nd argument"
+        )
+    pdf_name = sys.argv[1]
+    pdf = get_pdf(pdf_name)
+    sampler_kwargs = sys.argv[2] if len(sys.argv) >= 3 else None
+    if sampler_kwargs is not None:
+        with open(sampler_kwargs, "r") as f:
+            sampler_kwargs = yaml.safe_load(f)
+    output_folder = os.path.join("output_cobaya", pdf_name)
+    test_run(
+        pdf,
+        run_func,
+        process_output_func,
+        output_folder=output_folder,
+        budget=None,
+        budget_count_inf=False,
+        budget_count_parallel=False,
+        sampler_kwargs=sampler_kwargs,
+    )
