@@ -46,11 +46,12 @@ def run_func(
     settings.update(sampler_kwargs or {})
     for p, v in settings.items():
         if isinstance(v, str):
+            caster = int if p.lower().startswith("n") else float
             if v.endswith("d"):
                 v = v.removesuffix("d")
-                v = int(v or 1) * dim  # 'or 1' handles v="d"
+                v = caster(v or 1) * dim  # 'or 1' handles v="d"
             else:
-                v = int(v)
+                v = caster(v)
         setattr(polychord_settings, p, v)
     polychord_settings.base_dir = output_folder
     # Run PolyChord!
@@ -58,7 +59,7 @@ def run_func(
     sys.stdout.flush()
     try:
         polychord_results = run_polychord(
-            lambda x: (logpdf(x), []),
+            lambda x: ((lambda _: _[0] if hasattr(_, "__len__") else _)(logpdf(x)), []),
             prior=polychord_prior,
             settings=polychord_settings,
             nDims=dim,
