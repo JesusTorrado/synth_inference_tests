@@ -3,19 +3,19 @@ import sys
 import warnings
 from copy import deepcopy
 
+import numpy as np
+import pandas as pd  # type: ignore
 import yaml  # type: ignore
 
-from synth_inference_tests.get_pdf import get_pdf
-from synth_inference_tests.run import run as test_run
-from synth_inference_tests.mpi import is_main_process
-
-from getdist.mcsamples import loadMCSamples  # type: ignore
-
 # Importing PolyChord. May raise importerror if not installed
-from pypolychord.settings import PolyChordSettings  # type: ignore
-from pypolychord.priors import UniformPrior  # type: ignore
 from pypolychord import run_polychord  # type: ignore
+from pypolychord.priors import UniformPrior  # type: ignore
+from pypolychord.settings import PolyChordSettings  # type: ignore
 
+from synth_inference_tests.get_pdf import get_pdf
+from synth_inference_tests.mpi import is_main_process
+from synth_inference_tests.run import run as test_run
+from synth_inference_tests.utils import ColNames, generic_param_names
 
 defaults = {
     "nlive": "25d",
@@ -84,21 +84,25 @@ def load_logZ(stats_file):
             if line.startswith("log(Z)"):
                 return [float(n) for n in line.split("=")[1].split("+/-")]
 
+
 def process_output_func(return_values, output_folder=None):
     if not is_main_process:
         return
-    # PolyChord always writes to hard drive
+    # PolyChord always writes to hard drive!
     if return_values[0] is not None:
-        root = return_values[0].root
-        sample = loadMCSamples(root)
-        logZ, logZstd = load_logZ(return_values[0].root + ".stats")
+        chain_file_name = return_values[0].root + ".txt"
+        logZ, logZstd = return_values[0].logZ, return_values[0].logZerr
     elif output_folder is not None:
-        # TODO: implement loading case, incl logZ, logZstd
-        logZ, logZstd = None, None
-    # Create a "logpost" derived parameter with the **logposterior**
-    if "logpost" not in sample.getParamNames().list():
-        sample.addDerived(-sample.loglikes, "logpost")
-    return {"sampler": "polychord", "samples": sample, "logZ": logZ, "logZstd": logZstd}
+        chain_file_name = os.path.join(output_folder, "test.txt")
+        logZ, logZstd = load_logZ(os.path.join(output_folder, "products", "test.stats"))
+    else:
+        raise ValueError("Neither resturn_values nor output_folder provided.")
+    samples = pd.read_csv(chain_file_name, sep=r"\s+", header=None, dtype=np.float64)
+    samples.drop(columns=1, inplace=True)
+    colnames = [ColNames.weight]
+    colnames += generic_param_names(len(samples.columns) - 1, based_0=False)
+    samples.rename(columns=dict(zip(samples.columns, colnames)), inplace=True)
+    return {"sampler": "polychord", "samples": samples, "logZ": logZ, "logZstd": logZstd}
 
 
 # Runnable as a script, just for tests

@@ -1,16 +1,16 @@
 import os
 from time import time
-from typing import Mapping, Sequence
 from warnings import warn
 
 import numpy as np
+import pandas as pd  # type: ignore
 import yaml  # type: ignore
 
 from .pdf import PDF
 from .mpi import is_main_process, mpi_comm, mpi_size, get_num_threads
-from .utils import create_path, kl, kl_sym, kl_norm_sym
-
-result_file = "result.yaml"
+from .utils import kl, kl_sym, kl_norm_sym, generic_param_names, ColNames
+from .io import create_path, result_file, samples_file, dump_result
+from .plots import plot_triangle
 
 
 def run(
@@ -109,6 +109,10 @@ def run(
     if is_main_process:
         print("Processing sampler output...")
     try:
+        # NB: expects to be called by all processes (e.g. MPI-parallel processes with
+        #     a separate chain per process).
+        #     If not needed, put a `if not mpi.is_main_process: return None` on top of the
+        #     definition.
         sampler_results = process_output_func(
             return_values,
             output_folder=products_folder,
@@ -118,19 +122,26 @@ def run(
         print(f"Error processing output: {excpt}")
         processing_success = False  # only MPI rank 0 ever gets here
     processing_success = mpi_comm.bcast(processing_success)
+    paramnames = generic_param_names(pdf.dim, based_0=False)
+    if is_main_process:
+        # (Re)create derived parameters for log-posterior, log-likelihood, log-prior
+        sample = sampler_results["samples"]
+        loglikes = pdf.logp(sample[paramnames].to_numpy())
+        sample[ColNames.logpost] = loglikes + pdf.logprior_density
+        sample[ColNames.loglike] = loglikes
+        sample[ColNames.logprior] = pdf.logprior_density
     if not processing_success:
         return results if is_main_process else None
     mpi_comm.barrier()
-    if is_main_process:
-        print("Computing results...")
     # Do our side of the tests and plots
     if is_main_process:
+        print("Computing results...")
         results.update(sampler_results)
         # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
         # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
-        sample_orig = results.pop("samples")
+        sample_orig = results["samples"]
         sample_ref = pdf.samples()
-        if sample_ref.shape[1] == pdf.dim + 1:
+        if sample_ref is not None and sample_ref.shape[1] == pdf.dim + 1:
             weights_ref = sample_ref[:, 0]
             sample_ref = sample_ref[:, 1:]
         else:
@@ -186,7 +197,7 @@ def run(
             )
         # Evidence
         results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
-        # Save results object
+        # Save results object and samples
         dump_result(results, output_folder)
     # Plots
     if is_main_process:
@@ -196,65 +207,3 @@ def run(
     if is_main_process:
         print("Done!")
     return results if is_main_process else None
-
-
-def dump_result(result, output_folder):
-    with open(os.path.join(output_folder, result_file), "w") as f:
-        yaml.dump(result, f)
-
-
-def plot_triangle(
-    sample, output_folder, filename="triangle.png", pdf=None, filled=True
-):
-    tab10_colors = (
-        "#1f77b4",
-        "#ff7f0e",
-        "#2ca02c",
-        "#d62728",
-        "#9467bd",
-        "#8c564b",
-        "#e377c2",
-        "#7f7f7f",
-        "#bcbd22",
-        "#17becf",
-    )
-    from getdist import plots as gdplt  # type: ignore
-    from getdist.mcsamples import MCSamples  # type: ignore
-
-    g = gdplt.get_subplot_plotter()
-    if not isinstance(sample, Mapping) and not isinstance(sample, Sequence):
-        sample = {"This run": sample}
-    elif isinstance(sample, Sequence):
-        sample = {f"Run #{i + 1}": s for i, s in enumerate(sample)}
-    to_plot = list(sample.values())
-    filled = [filled] * len(to_plot)
-    labels = list(sample.keys())
-    colors = list(tab10_colors[: len(to_plot)])
-    paraminfos = to_plot[0].getParamNames().names
-    sampled_paramnames = [p.name for p in paraminfos if not p.isDerived]
-    paramnames = sampled_paramnames + ["logpost"]
-    if pdf is not None:
-        truth_sample = pdf.samples()
-        if truth_sample is not None:
-            truth_weights = None
-            if truth_sample.shape[1] == pdf.dim + 1:
-                truth_weights, truth_sample = truth_sample[:, 0], truth_sample[:, 1:]
-            kwargs = {"names": sampled_paramnames}
-            kwargs["ranges"] = {
-                p: pdf.bounds[i] for i, p in enumerate(sampled_paramnames)
-            }
-            truth_sample = MCSamples(
-                weights=truth_weights, samples=truth_sample, **kwargs
-            )
-            to_plot += [truth_sample]
-            filled += [False]
-            labels += ["Truth"]
-            colors += ["k"]
-    g.triangle_plot(
-        to_plot,
-        params=paramnames,
-        filled=filled,
-        legend_labels=labels,
-        contour_colors=colors,
-    )
-    g.export(os.path.join(output_folder, filename))

@@ -1,21 +1,52 @@
-import os
 import numpy as np
 from numpy.linalg import det
-from scipy import integrate
-from scipy import interpolate
+from scipy import integrate, interpolate  # type: ignore
 
 
-path_data = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pdfs", "data")
+class ColNames:
+    weight = "weight"
+    logpost = "logpost"
+    loglike = "loglike"
+    logprior = "logprior"
 
 
-def create_path(path):
-    """Creates the folder path ``path`` if it does not exist."""
-    if not os.path.exists(path):
-        os.makedirs(path)
+def generic_param_names(dim, prefix="x_", based_0=False):
+    """
+    Returns a list of indexed parameter names, by default as ``[x_1, ..., x_<dim>]``.
+    """
+    return [prefix + f"{i + (0 if based_0 else 1)}" for i in range(dim)]
 
 
-def kl_sym(sample_1, logp_sample_1, logp_2_sample_1,
-           sample_2, logp_sample_2, logp_1_sample_2, weights_1=None, weights_2=None):
+def pd_to_gd_samples(samples, bounds):
+    """
+    Coverts a pandas samples table with columns ``weights, [params], logpost, [etc]`` to
+    getdist.
+    """
+    from getdist.mcsamples import MCSamples  # type: ignore
+
+    # NB: Cannot use addDerived after creation because getdist removes low weight samples
+    paramnames = generic_param_names(len(samples.columns) - 4, based_0=False)
+    paramnames += [getattr(ColNames, p) + "*" for p in ["logpost", "loglike", "logprior"]]
+    gdsample = MCSamples(
+        weights=samples[ColNames.weight].to_numpy(),
+        samples=samples[[p.rstrip("*") for p in paramnames]].to_numpy(),
+        names=paramnames,
+        ranges=dict(zip(paramnames, bounds)),
+        ignore_rows=0,
+    )
+    return gdsample
+
+
+def kl_sym(
+    sample_1,
+    logp_sample_1,
+    logp_2_sample_1,
+    sample_2,
+    logp_sample_2,
+    logp_1_sample_2,
+    weights_1=None,
+    weights_2=None,
+):
     """
     Computes the Jeffrey's divergence between two distributions given samples of each and
     their log-posterior functions.
@@ -53,9 +84,13 @@ def kl_norm(mean_0, cov_0, mean_1, cov_1):
     """
     cov_1_inv = np.linalg.inv(cov_1)
     dim = len(mean_0)
-    return 0.5 * (np.log(det(cov_1)) - np.log(det(cov_0)) - dim +
-                  np.trace(cov_1_inv @ cov_0) +
-                  (mean_1 - mean_0).T @ cov_1_inv @ (mean_1 - mean_0))
+    return 0.5 * (
+        np.log(det(cov_1))
+        - np.log(det(cov_0))
+        - dim
+        + np.trace(cov_1_inv @ cov_0)
+        + (mean_1 - mean_0).T @ cov_1_inv @ (mean_1 - mean_0)
+    )
 
 
 # Originally from extrapops (SOBBH population synthesis)
@@ -74,9 +109,7 @@ def invCDFinterp(xs, pdf_func, pdf_args=None, splrep_kwargs=None):
     Returns a tuple of the ``(CDF, x)`` samples and the interpolator.
     """
     quad_kwargs = {"args": pdf_args} if pdf_args else {}
-    CDF = np.array(
-        [integrate.quad(pdf_func, xs[0], x_i, **quad_kwargs)[0] for x_i in xs]
-    )
+    CDF = np.array([integrate.quad(pdf_func, xs[0], x_i, **quad_kwargs)[0] for x_i in xs])
     # Sometimes (very rarely) not sorted due to numerical noise. Simply delete bad entry
     for _ in range(len(CDF) - 1):
         i_unsorted_left = np.argwhere(np.diff(CDF) < 0)
@@ -100,6 +133,6 @@ def invCDFinterp(xs, pdf_func, pdf_args=None, splrep_kwargs=None):
     # Remove all points after CDF reaches 1 (no chance to generate them)
     # Now np.isclose should be enough
     first_one = next(i for i, CDFi in enumerate(CDF) if np.isclose(CDFi, 1))
-    CDF = CDF[:first_one + 1]
-    xs = xs[:first_one + 1]
+    CDF = CDF[: first_one + 1]
+    xs = xs[: first_one + 1]
     return (CDF, xs, interpolate.splrep(CDF, xs, **(splrep_kwargs or {})))

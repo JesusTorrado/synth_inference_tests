@@ -11,7 +11,7 @@ from warnings import warn
 import numpy as np
 
 from ..pdf import PDF
-from ..utils import path_data
+from ..io import path_data
 
 
 class Rosenbrock(PDF):

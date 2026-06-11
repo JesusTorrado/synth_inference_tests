@@ -1,15 +1,17 @@
 import os
 import sys
 
-import yaml  # type: ignore
 import numpy as np
-
+import yaml  # type: ignore
+from cobaya.output import load_samples  # type: ignore
 from cobaya.run import run as cobaya_run  # type: ignore
-from getdist.mcsamples import loadMCSamples  # type: ignore
 
 from synth_inference_tests.get_pdf import get_pdf
-from synth_inference_tests.run import run as test_run
 from synth_inference_tests.mpi import is_main_process
+from synth_inference_tests.run import run as test_run
+from synth_inference_tests.utils import ColNames, generic_param_names
+
+skip = 0.33  # fraction of initial samples to be removed
 
 
 def cobaya_model_input(loglikelihood, bounds, paramnames=None):
@@ -33,19 +35,14 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     bounds = np.atleast_2d(bounds)
     dim = len(bounds)
     if paramnames is None:
-        paramnames = [f"x_{i + 1}" for i in range(dim)]
+        paramnames = generic_param_names(dim, based_0=False)
     else:
         assert len(paramnames) == dim, (
             "If paramnames given, it must have as many parameters as the dimensionality "
             f"specified with 'bounds': {dim}."
         )
     info = {
-        "params": {
-            p: {
-                "prior": list(b),
-            }
-            for p, b in zip(paramnames, bounds)
-        }
+        "params": {p: {"prior": list(b), "ref": None} for p, b in zip(paramnames, bounds)}
     }
 
     # NB: `logp` methods in this package have unnamed args, which Cobaya does not support.
@@ -53,13 +50,9 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     def lkl(**kwargs):
         return loglikelihood(list(kwargs.values()))
 
-    info.update(
-        {
-            "likelihood": {
-                "test": {"external": lkl, "requires": {}, "input_params": paramnames}
-            }
-        }
-    )
+    info["likelihood"] = {
+        "test": {"external": lkl, "requires": {}, "input_params": paramnames}
+    }
     return info
 
 
@@ -93,25 +86,37 @@ def run_func(
 
 
 def process_output_func(return_values, output_folder=None):
-    if not is_main_process:
-        return None
     if return_values is not None:
         upd_input, sampler = return_values
-        products = sampler.products(to_getdist=True, combined=True, skip_samples=0.33)
-        sample = products["sample"]
+        # Next line NEEDS to run MPI-parallelised, in order to combine MCMC chains.
+        samples = sampler.samples(combined=True, skip_samples=skip).data
+        products = sampler.products()
         logZ = products.get("logZ")
         logZstd = products.get("logZstd")
         if logZ is not None:  # yaml cannot read numpy floats
             logZ = float(logZ)
             logZstd = float(logZstd)
     elif output_folder is not None:
-        sample_folder = os.path.abspath(output_folder)
-        sample_folder += "/"  # to force GetDist to treat is as folder, not prefix
-        sample = loadMCSamples(sample_folder)
-        logZ = None
-    # Create a "logpost" derived parameter with the **logposterior**
-    sample.addDerived(-sample.loglikes, "logpost")
-    results = {"samples": sample}
+        if is_main_process:
+            samples = load_samples(
+                os.path.abspath(output_folder) + "/", combined=True, skip=skip
+            ).data
+        else:
+            samples = None
+        # TODO: read from hard drive for e.g. PolyChord!
+        logZ, logZstd = None, None
+    else:
+        raise ValueError("Neither resturn_values nor output_folder provided.")
+    if not is_main_process:
+        return None
+    # Process samples to get the expected columns
+    samples.drop(columns="minuslogpost", inplace=True)
+    cols_drop = [c for c in samples.columns if "chi2" in c or "prior" in c]
+    samples.drop(columns=cols_drop, inplace=True)
+    colnames = [ColNames.weight]
+    colnames += generic_param_names(len(samples.columns) - 1, based_0=False)
+    samples.rename(columns=dict(zip(samples.columns, colnames)), inplace=True)
+    results = {"samples": samples}
     if logZ is not None:
         results.update({"logZ": logZ, "logZstd": logZstd})
     return results

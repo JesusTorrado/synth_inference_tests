@@ -2,18 +2,17 @@ import os
 import sys
 import warnings
 
-import yaml
 import numpy as np
+import pandas as pd
+import yaml  # type: ignore
+
+# GPry import(s)
+from gpry.run import Runner  # type: ignore
 
 from synth_inference_tests.get_pdf import get_pdf
-from synth_inference_tests.run import run as test_run
 from synth_inference_tests.mpi import is_main_process
-
-from gpry.run import Runner  # type: ignore
-from getdist.mcsamples import loadMCSamples  # type: ignore
-
-
-sample_subdir = "sample"
+from synth_inference_tests.run import run as test_run
+from synth_inference_tests.utils import ColNames, generic_param_names
 
 
 def run_func(
@@ -62,19 +61,35 @@ def process_output_func(return_values, output_folder=None):
         return
     if return_values is not None:
         runner = return_values[0]
-        runner.plot_progress(timing=True, trace=True, corner=True)
-        sample = runner.last_mc_samples(as_getdist=True)
+        samples = runner.last_mc_samples(as_pandas=True)
     elif output_folder is not None:
         runner = Runner(checkpoint=output_folder, load_checkpoint="resume")
-        sample_folder = os.path.abspath(os.path.join(output_folder, sample_subdir))
-        sample_folder += "/"  # to force GetDist to treat is as folder, not prefix
-        sample = loadMCSamples(sample_folder)
-        runner.plot_progress(timing=True, trace=True, corner=True)
-    logZ, logZstd = None, None
-    # Create a "logpost" derived parameter with the **logposterior**
-    if "logpost" not in sample.getParamNames().list():
-        sample.addDerived(-sample.loglikes, "logpost")
-    results = {"sampler": "gpry", "samples": sample}
+        samples = pd.read_csv(
+            os.path.join(output_folder, "mc_samples.txt"),
+            sep=r"\s+",
+            header=0,
+            dtype=np.float64,
+        )
+        # This will have read the columns wrong, interpreting the leading `#` as a column
+        # (rename last to drop it)
+        dummycol = "-"
+        samples.rename(
+            columns=dict(
+                zip(list(samples.columns), list(samples.columns)[1:] + [dummycol])
+            ),
+            inplace=True,
+        )
+        samples.drop(columns=dummycol, inplace=True)
+    # Generic samples post-processing (either loaded or runtime)
+    cols_drop = [c for c in samples.columns if "log" in c]
+    samples.drop(columns=cols_drop, inplace=True)
+    colnames = [ColNames.weight]
+    colnames += generic_param_names(len(samples.columns) - 1, based_0=False)
+    samples.rename(columns=dict(zip(samples.columns, colnames)), inplace=True)
+    logZ, logZstd = [float(x) if x is not None else None for x in runner.last_mc_logZ()]
+    # Do some plots
+    runner.plot_progress(timing=True, trace=True, corner_final=True)
+    results = {"sampler": "gpry", "samples": samples}
     if logZ is not None:
         results.update({"logZ": logZ, "logZstd": logZstd})
     results["logp_func"] = lambda x: runner.surrogate.logp(np.atleast_2d(x))
@@ -87,7 +102,7 @@ if __name__ == "__main__":
     if 2 < len(sys.argv[1:]) < 1:
         raise ValueError(
             "Pass likelihood name as first arg, e.g. 'gaussian5', and (optionally) "
-            ".yaml file for sampler configuration as 2nd argument"
+            "a .yaml file for sampler configuration as 2nd argument"
         )
     pdf_name = sys.argv[1]
     pdf = get_pdf(pdf_name)
