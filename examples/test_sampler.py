@@ -2,11 +2,12 @@ import os
 import sys
 from importlib import import_module
 from pprint import pprint
-import yaml
+
+import yaml  # type: ignore
 
 from synth_inference_tests.get_pdf import get_pdfs
-from synth_inference_tests.run import run as test_run
 from synth_inference_tests.mpi import is_main_process
+from synth_inference_tests.run import run as test_run
 
 
 def get_wrapper(sampler_name):

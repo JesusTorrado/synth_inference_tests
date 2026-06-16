@@ -11,7 +11,7 @@ from warnings import warn
 import numpy as np
 
 from ..pdf import PDF
-from ..io import path_data
+from ..io import path_pdfs_data
 
 
 class Rosenbrock(PDF):
@@ -36,7 +36,7 @@ class Rosenbrock(PDF):
 
     def samples(self, n=None):
         try:
-            samples = np.load(os.path.join(path_data, self.NameDim + ".npy"))
+            samples = np.load(os.path.join(path_pdfs_data, self.NameDim + ".npy"))
         except FileNotFoundError:
             warn(f"Samples not precomputed for Rosenbrock with dim {self.dim}.")
             return None
