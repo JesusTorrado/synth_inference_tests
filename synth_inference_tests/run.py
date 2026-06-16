@@ -3,14 +3,12 @@ from time import time
 from warnings import warn
 
 import numpy as np
-import pandas as pd  # type: ignore
-import yaml  # type: ignore
 
+from .io import create_path, dump_result
+from .mpi import get_num_threads, is_main_process, mpi_comm, mpi_size
 from .pdf import PDF
-from .mpi import is_main_process, mpi_comm, mpi_size, get_num_threads
-from .utils import kl, kl_sym, kl_norm_sym, generic_param_names, ColNames
-from .io import create_path, result_file, samples_file, dump_result
 from .plots import plot_triangle
+from .utils import ColNames, generic_param_names, kl, kl_norm_sym, kl_sym
 
 
 def run(
@@ -57,7 +55,7 @@ def run(
     mpi_comm.barrier()
     start_total = time()
     try:
-        results, return_values = run_func(
+        sampler_results, return_values = run_func(
             pdf.logpdf,
             pdf.bounds,
             output_folder=products_folder,
@@ -68,6 +66,8 @@ def run(
         )
     except Exception as excpt:
         warn(f"Sampling ended with unmanaged/unexpected error '{excpt}'.")
+    if is_main_process:
+        results.update(sampler_results)
     delta_total = time() - start_total
     mpi_comm.barrier()
     # Timings and # evals
