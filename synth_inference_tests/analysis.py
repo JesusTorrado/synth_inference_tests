@@ -108,6 +108,7 @@ def aggregate_table(table, return_non_converged=False):
         if comb not in combinations:
             combinations.append(comb)
     # Start filling up the new table, removing the used rows
+    N_comb = []
     for comb in combinations:
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', UserWarning)
@@ -116,6 +117,7 @@ def aggregate_table(table, return_non_converged=False):
             ][table[common_cols[2]] == comb[2]][table["end_state"] == "c"].index.to_list()
         rows = table.loc[i_comb].copy()
         table.drop(i_comb, inplace=True)
+        N_comb.append(len(rows))
         # Common data to be added: uniquify and merge, or concatenate if >1 different
         row_data = {col: set(rows[col]) for col in agg_table_cols}
         row_data = {
@@ -140,6 +142,8 @@ def aggregate_table(table, return_non_converged=False):
             if new_col not in agg_table.columns:
                 agg_table[new_col] = []
         agg_table.loc[len(agg_table)] = row_data
+    # Add aggregation counters
+    agg_table.insert(len(common_cols), "N", N_comb)
     if return_non_converged:
         return agg_table, table
     if len(table):
