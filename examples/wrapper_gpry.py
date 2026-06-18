@@ -18,6 +18,7 @@ from synth_inference_tests.utils import ColNames, generic_param_names
 def run_func(
     logpdf,
     bounds,
+    ref_bounds=None,
     output_folder=None,
     budget=None,
     budget_count_inf=False,
@@ -37,6 +38,7 @@ def run_func(
         runner = Runner(
             logpdf,
             bounds,
+            ref_bounds=ref_bounds,
             checkpoint=output_folder,
             load_checkpoint="overwrite",
             plots=False,

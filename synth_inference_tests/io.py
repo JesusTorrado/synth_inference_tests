@@ -32,7 +32,8 @@ def load_samples(output_folder):
 
 
 def dump_result(result, output_folder):
-    samples = result.pop("samples")
-    dump_samples(samples, output_folder)
+    samples = result.pop("samples", None)
+    if samples is not None:
+        dump_samples(samples, output_folder)
     with open(os.path.join(output_folder, result_file), "w") as f:
         yaml.dump(result, f)

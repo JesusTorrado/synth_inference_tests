@@ -14,7 +14,7 @@ from synth_inference_tests.utils import ColNames, generic_param_names
 skip = 0.33  # fraction of initial samples to be removed
 
 
-def cobaya_model_input(loglikelihood, bounds, paramnames=None):
+def cobaya_model_input(loglikelihood, bounds, paramnames=None, ref_bounds=None):
     """
     Returns a Cobaya model input dict with the given likelihood and uniform prior bounds.
 
@@ -44,6 +44,9 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
     info = {
         "params": {p: {"prior": list(b), "ref": None} for p, b in zip(paramnames, bounds)}
     }
+    if ref_bounds is not None:
+        for v, rb in zip(info["params"].values(), np.atleast_2d(ref_bounds)):
+            v["ref"] = {"dist": "uniform", "min": rb[0], "max": rb[1]}
 
     # NB: `logp` methods in this package have unnamed args, which Cobaya does not support.
     # We need to create a wrapper with named args.
@@ -59,13 +62,14 @@ def cobaya_model_input(loglikelihood, bounds, paramnames=None):
 def run_func(
     logpdf,
     bounds,
+    ref_bounds=None,
     output_folder=None,
     budget=None,
     budget_count_inf=False,
     budget_count_parallel=False,
     sampler_kwargs=None,
 ):
-    input_dict = cobaya_model_input(logpdf, bounds, paramnames=None)
+    input_dict = cobaya_model_input(logpdf, bounds, paramnames=None, ref_bounds=ref_bounds)
     input_dict["sampler"] = sampler_kwargs or {"mcmc": None}
     sampler = list(input_dict["sampler"].keys())[0]
     input_dict["sampler"][sampler] = input_dict["sampler"][sampler] or {}

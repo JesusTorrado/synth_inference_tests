@@ -58,6 +58,7 @@ def run(
         sampler_results, return_values = run_func(
             pdf.logpdf,
             pdf.bounds,
+            ref_bounds=getattr(pdf, "ref_bounds", None),
             output_folder=products_folder,
             budget=budget,
             budget_count_inf=False,
@@ -100,8 +101,11 @@ def run(
     elif end_state == "?":
         if is_main_process:
             print("The sampler has finished with unknown end state.")
+            dump_result(results, output_folder)
+        return results if is_main_process else None
     elif end_state == "e":
         if is_main_process:
+            print("The sampler has finished in an error end state.")
             dump_result(results, output_folder)
         return results if is_main_process else None
     # Compute/process necessary quantities for the report, do sampler-internal plots, etc.

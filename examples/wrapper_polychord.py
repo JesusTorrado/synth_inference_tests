@@ -32,6 +32,7 @@ defaults = {
 def run_func(
     logpdf,
     bounds,
+    ref_bounds=None,
     output_folder=None,
     budget=None,
     budget_count_inf=False,
