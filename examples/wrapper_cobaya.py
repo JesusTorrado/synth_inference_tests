@@ -68,6 +68,7 @@ def run_func(
     budget_count_inf=False,
     budget_count_parallel=False,
     sampler_kwargs=None,
+    fiducial_samples=None,
 ):
     input_dict = cobaya_model_input(logpdf, bounds, paramnames=None, ref_bounds=ref_bounds)
     input_dict["sampler"] = sampler_kwargs or {"mcmc": None}

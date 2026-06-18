@@ -38,6 +38,7 @@ def run_func(
     budget_count_inf=False,
     budget_count_parallel=False,
     sampler_kwargs=None,
+    fiducial_samples=None,
 ):
     results = {"sampler": "polychord"}
     dim = len(bounds)

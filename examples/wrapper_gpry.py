@@ -24,7 +24,9 @@ def run_func(
     budget_count_inf=False,
     budget_count_parallel=False,
     sampler_kwargs=None,
+    fiducial_samples=None,
 ):
+    dim = len(bounds)
     results = {"sampler": "gpry"}
     if sampler_kwargs is None:
         sampler_kwargs = {}
@@ -46,6 +48,14 @@ def run_func(
             load_checkpoint="overwrite",
             **sampler_kwargs,
         )
+        # Pass the fiducial sample for plots; don't if no plotting, not to waste time
+        if fiducial_samples is not None and sampler_kwargs["plots"]:
+            if fiducial_samples.shape[1] == dim + 1:
+                fiducial_weights = fiducial_samples[:, 0]
+                fiducial_samples = fiducial_samples[:, 1:]
+            else:
+                fiducial_weights = None
+            runner.set_fiducial_mc(fiducial_samples, weights=fiducial_weights)
         runner.run()
     except Exception as excpt:
         warnings.warn(f"GPry finished with an error: {excpt}")

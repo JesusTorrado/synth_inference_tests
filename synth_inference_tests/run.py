@@ -51,6 +51,10 @@ def run(
         }
         if i is not None:
             results["i"] = i
+    # Get the fiducial samples early, to pass them to the sampler for plots/checks/...
+    if is_main_process:
+        sample_ref = pdf.samples()
+        sample_ref_copy = sample_ref.copy()  # in case it's modified inside run_func
     # Run external sampler
     mpi_comm.barrier()
     start_total = time()
@@ -64,6 +68,7 @@ def run(
             budget_count_inf=False,
             budget_count_parallel=False,
             sampler_kwargs=sampler_kwargs,
+            fiducial_samples=sample_ref_copy if is_main_process else None,
         )
     except Exception as excpt:
         warn(f"Sampling ended with unmanaged/unexpected error '{excpt}'.")
@@ -144,7 +149,6 @@ def run(
         # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
         # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
         sample_orig = results["samples"]
-        sample_ref = pdf.samples()
         if sample_ref is not None and sample_ref.shape[1] == pdf.dim + 1:
             weights_ref = sample_ref[:, 0]
             sample_ref = sample_ref[:, 1:]
