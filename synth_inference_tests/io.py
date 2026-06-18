@@ -7,7 +7,7 @@ import yaml  # type: ignore
 from .utils import ColNames, generic_param_names
 
 result_file = "result.yaml"
-samples_file = "samples.npy"  # array: weights [parameters] logpost loglike logprior
+_default_samples_file = "samples.npy"  # weights [parameters] logpost loglike logprior
 path_pdfs_data = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pdfs", "data")
 
 
@@ -17,13 +17,17 @@ def create_path(path):
         os.makedirs(path)
 
 
-def dump_samples(sample, output_folder):
-    # The following assumes the sample contains "[parameters] logpost, loglike, logprior"
+def dump_samples(sample, output_folder, samples_file=_default_samples_file):
+    # The following assumes the sample contains
+    # "weights [parameters] logpost, loglike, logprior"
     np.save(os.path.join(output_folder, samples_file), sample.to_numpy().T)
 
 
-def load_samples(output_folder):
-    # The following assumes the sample contains "[parameters] logpost, loglike, logprior"
+def load_samples(output_folder, samples_file=_default_samples_file):
+    # The following assumes the sample contains
+    # "weights [parameters] logpost, loglike, logprior"
+    if not samples_file.lower().endswith(".npy"):
+        samples_file += ".npy"
     samples_arr = np.load(os.path.join(output_folder, samples_file))
     colnames = [ColNames.weight]
     colnames += generic_param_names(samples_arr.shape[0] - 4, based_0=False)

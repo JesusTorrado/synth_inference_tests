@@ -18,11 +18,16 @@ Custom methods:
 
 """
 
+import os
 import inspect
 import time
+from warnings import warn
+
 import numpy as np
 
 from .mpi import is_main_process
+from .utils import generic_param_names, ColNames
+from .io import load_samples, path_pdfs_data
 
 
 class PDF():
@@ -68,7 +73,26 @@ class PDF():
         return self.logpdf(params) + self.logprior_density
 
     def samples(self, n=None):
-        return None
+        """
+        Returns samples from the pdf. If it has one more column than dimensions, then the
+        first column is the sample weight (in that case, it should print a warning).
+        """
+        # Generic implementation for pre-computed samples, if available,
+        # If a samples can be generated in a simpler way, override this method
+        # (see e.g. the Gaussian class).
+        filename = os.path.join(path_pdfs_data, self.NameDim + ".npy")
+        try:
+            samples = load_samples(path_pdfs_data, samples_file=self.NameDim)
+        except FileNotFoundError:
+            warn(f"Samples not precomputed for {self.NameDim}.")
+            return None
+        warn("Loaded pre-computed samples. Ignoring the number of samples requested.")
+        columns = []
+        if ColNames.weight in samples.columns:
+            columns += [ColNames.weight]
+            warn("Returning samples weights as first column of the table.")
+        columns += generic_param_names(self.dim, based_0=False)
+        return samples[columns].to_numpy(dtype=np.float64)
 
     @property
     def logZ(self):
@@ -90,10 +114,13 @@ class PDF():
         sample = self.samples(n)
         if sample is None:
             raise NotImplementedError("Reference samples not implemented for this pdf.")
+        weights = None
+        if sample.shape[1] == self.dim + 1:
+            weights, sample = sample[:, 0], sample[:, 1:]
         kwargs = {"names": [f"x_{i + 1}" for i in range(self.dim)]}
         if getattr(self, "bounds", None) is not None:
             kwargs["ranges"] = {p: self.bounds[i] for i, p in enumerate(kwargs["names"])}
-        gdsample = MCSamples(samples=sample, **kwargs)
+        gdsample = MCSamples(samples=sample, weights=weights, **kwargs)
         g = gdplt.get_subplot_plotter()
         g.triangle_plot(gdsample)
         if filename:
