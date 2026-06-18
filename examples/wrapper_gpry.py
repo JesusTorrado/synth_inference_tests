@@ -34,6 +34,9 @@ def run_func(
     if sampler_kwargs.get("options") is None:
         sampler_kwargs["options"] = {}
     sampler_kwargs["options"]["max_total"] = budget
+    # By default, suppress plots unless explicitly asked
+    if "plots" not in sampler_kwargs:
+        sampler_kwargs["plots"] = False
     try:
         runner = Runner(
             logpdf,
@@ -41,7 +44,6 @@ def run_func(
             ref_bounds=ref_bounds,
             checkpoint=output_folder,
             load_checkpoint="overwrite",
-            plots=False,
             **sampler_kwargs,
         )
         runner.run()
