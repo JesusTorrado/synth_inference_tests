@@ -1,5 +1,6 @@
 import os
 import sys
+from pprint import pprint
 
 import numpy as np
 import yaml  # type: ignore
@@ -142,7 +143,7 @@ if __name__ == "__main__":
         with open(sampler_kwargs, "r") as f:
             sampler_kwargs = yaml.safe_load(f)
     output_folder = os.path.join("output_cobaya", pdf_name)
-    test_run(
+    results = test_run(
         pdf,
         run_func,
         process_output_func,
@@ -152,3 +153,7 @@ if __name__ == "__main__":
         budget_count_parallel=False,
         sampler_kwargs=sampler_kwargs,
     )
+    if is_main_process:
+        print("\n----RESULTS----\n")
+        pprint(results)
+        print()
