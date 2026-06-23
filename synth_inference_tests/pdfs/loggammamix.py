@@ -76,7 +76,7 @@ class LogGammaMix(PDF):
         if self.dims_norm:
             sample[:, self.dims_norm] = self.norm_1_2.rvs(
                 n * len(self.dims_norm)
-            ).reshape(n, len(self.dims_loggamma))
+            ).reshape(n, len(self.dims_norm))
         return sample
 
     @property
