@@ -54,7 +54,8 @@ def run(
     # Get the fiducial samples early, to pass them to the sampler for plots/checks/...
     if is_main_process:
         sample_ref = pdf.samples()
-        sample_ref_copy = sample_ref.copy()  # in case it's modified inside run_func
+        # Copy in case it is modified inside run_func
+        sample_ref_copy = sample_ref.copy() if sample_ref is not None else None
     # Run external sampler
     mpi_comm.barrier()
     start_total = time()
@@ -135,7 +136,8 @@ def run(
     if is_main_process:
         # (Re)create derived parameters for log-posterior, log-likelihood, log-prior
         sample = sampler_results["samples"]
-        loglikes = pdf.logp(sample[paramnames].to_numpy())
+        sample_X = sample[paramnames].to_numpy()
+        loglikes = pdf.logp(sample_X)
         sample[ColNames.logpost] = loglikes + pdf.logprior_density
         sample[ColNames.loglike] = loglikes
         sample[ColNames.logprior] = pdf.logprior_density

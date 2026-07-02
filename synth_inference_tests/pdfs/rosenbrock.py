@@ -36,7 +36,6 @@ class Rosenbrock(PDF):
     def logZ(self):
         return {
             # PolyChord (nlive=200d/num_repeats=50d/prec_crit=0.001), avg 20 realisations
-            # 2: -5.824,  # +/- 0.025
             2: -5.804,  # analytic, from arXiv:1110.2997; Ours: -5.825 +/- 0.025
             3: -10.465,  # +/- 0.025
             4: -15.08,  # +/- 0.03
