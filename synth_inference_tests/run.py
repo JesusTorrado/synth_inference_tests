@@ -153,10 +153,12 @@ def run(
     mpi_comm.barrier()
     # Do our side of the tests and plots
     if is_main_process:
-        print("Computing metrics...")
         results.update(sampler_results)
-        weights = sample[ColNames.weight].to_numpy()
         sample_orig = results["samples"]
+        print("Plotting...")
+        plot_triangle(sample_orig, pdf=pdf, output_folder=plots_folder)
+        print("Computing metrics...")
+        weights = sample[ColNames.weight].to_numpy()
         if sample_ref is not None and sample_ref.shape[1] == pdf.dim + 1:
             weights_ref = sample_ref[:, 0]
             sample_ref = sample_ref[:, 1:]
@@ -235,10 +237,6 @@ def run(
         results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
         # Save results object and samples
         dump_result(results, output_folder)
-    # Plots
-    if is_main_process:
-        print("Plotting...")
-        plot_triangle(sample_orig, pdf=pdf, output_folder=plots_folder)
     mpi_comm.barrier()
     if is_main_process:
         print("Done!")

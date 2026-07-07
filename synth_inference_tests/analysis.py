@@ -51,8 +51,11 @@ def create_table(output_folder, aggregate=False):
         col_parallel,
         # Convergence and results
         "end_state",
-        "kl",
-        "kl_norm",
+        "kl_norm_sym",
+        "kl_sym",
+        "js",
+        "kl_sym_surr",
+        "js_surr",
         "logZ",
         "logZstd",
         "logZ_truth",
@@ -72,7 +75,8 @@ def create_table(output_folder, aggregate=False):
     ]
     new_columns_order += [col for col in last_columns if col in table.columns]
     table = table[new_columns_order]
-    table.sort_values(["pdf", "dim"], inplace=True)
+    table.sort_values(["pdf", "dim", "i"], inplace=True)
+    table.reset_index(drop=True, inplace=True)
     if aggregate:
         table = aggregate_table(table)
     return table
@@ -82,7 +86,7 @@ def aggregate_table(table, return_non_converged=False):
     """
     Aggregates rows corresponding to *converged* runs of the same pdf with the same
     sampler.
-    
+
     If ``return_non_converged``, it returns a tuple ``(aggregated_table, errors_table)``,
     where the errors table is formatted as the input one.
     """
@@ -90,7 +94,16 @@ def aggregate_table(table, return_non_converged=False):
     table = table.copy(deep=True)
     common_cols = ["pdf", "dim", "sampler"]
     # Operations for columns (default operation: concatenate)
-    average_cols = [["logZ", "logZstd"], ["time_overhead"], ["n_truth"]]
+    average_cols = [
+        ["kl_norm_sym"],
+        ["kl_sym"],
+        ["kl_sym_surr"],
+        ["js"],
+        ["js_surr"],
+        ["logZ", "logZstd"],
+        ["time_overhead"],
+        ["n_truth"],
+    ]
     max_cols = ["n_truth_max_process"]
     # ...
     ignore_cols = list(chain.from_iterable(average_cols)) + max_cols
@@ -111,7 +124,7 @@ def aggregate_table(table, return_non_converged=False):
     N_comb = []
     for comb in combinations:
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore', UserWarning)
+            warnings.simplefilter("ignore", UserWarning)
             i_comb = table[table[common_cols[0]] == comb[0]][
                 table[common_cols[1]] == comb[1]
             ][table[common_cols[2]] == comb[2]][table["end_state"] == "c"].index.to_list()
