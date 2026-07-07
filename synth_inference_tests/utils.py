@@ -1,6 +1,11 @@
+from warnings import warn
+
 import numpy as np
 from numpy.linalg import det
 from scipy import integrate, interpolate  # type: ignore
+from scipy.special import erfc  # type: ignore
+from scipy.stats import chi2  # type: ignore
+from sklearn.neighbors import KernelDensity  # type: ignore
 
 
 class ColNames:
@@ -37,42 +42,39 @@ def pd_to_gd_samples(samples, bounds):
     return gdsample
 
 
-def kl_sym(
-    sample_1,
-    logp_sample_1,
-    logp_2_sample_1,
-    sample_2,
-    logp_sample_2,
-    logp_1_sample_2,
-    weights_1=None,
-    weights_2=None,
-):
+# From GPry
+def nstd_of_1d_nstd(n1, d, warn_inf=True):
     """
-    Computes the Jeffrey's divergence between two distributions given samples of each and
-    their log-posterior functions.
+    Radius of (hyper)volume in units of std's of a multivariate Gaussian of dimension
+    ``d`` for a credible (hyper)volume defined by the equivalent 1-dimensional
+    ``n1``-sigma interval.
     """
-    P_to_Q = kl(sample_1, logp_sample_1, logp_2_sample_1, weights_P=weights_1)
-    Q_to_P = kl(sample_2, logp_sample_2, logp_1_sample_2, weights_P=weights_2)
-    return P_to_Q + Q_to_P
+    nstd = np.sqrt(chi2.isf(erfc(n1 / np.sqrt(2)), d))
+    if warn_inf and not np.isfinite(nstd):
+        warn(f"Got -inf for n1={n1} and d={d}. This may cause errors.")
+    return nstd
 
 
-# Originally from GPry
-def kl(sample_P, logp_sample_P, logp_Q_sample_P, weights_P=None):
-    """
-    Computes a Monte Carlo estimate of the Kullback-Leibler divergence ``KL(P|Q)`` given
-    a sample from ``P`` and the log-posterior ``Q`` for that sample.
-    """
-    if weights_P is None:
-        weights_P = np.ones(len(sample_P))
-    else:
-        # Numerical stability: make the highest weight 1
-        weights_P /= max(weights_P)
-    kl = np.sum(weights_P * (logp_sample_P - logp_Q_sample_P)) / np.sum(weights_P)
-    return kl
-
-
-def kl_norm_sym(mean_0, cov_0, mean_1, cov_1):
-    return kl_norm(mean_0, cov_0, mean_1, cov_1) + kl_norm(mean_1, cov_1, mean_0, cov_0)
+def kde_logp_if_needed(sample, logps_sample, weights=None, logp_func=None):
+    if logp_func is None:
+        # Need to "whiten" scales, in order to get bandwidth approximately right
+        # (and even this way it's not very good, but order-of-mag should be OK for KL)
+        avgs = np.average(sample, weights=weights, axis=0)
+        scales = np.sqrt(np.diag(np.cov(sample.T, aweights=weights)))
+        transf = lambda x: (x - avgs) / scales
+        kde = KernelDensity(bandwidth="silverman")
+        kde.fit(transf(sample), sample_weight=weights)
+        # Now we need to normalize to the posterior -- use avg difference of top 2 sigma
+        # to adjust it to the values provided via `logps_sample`.
+        i_top = np.argwhere(
+            logps_sample > max(logps_sample) - nstd_of_1d_nstd(2, len(scales))
+        ).T[0]
+        diffs = logps_sample[i_top] - kde.score_samples(transf(sample[i_top]))
+        diffs_avg = np.average(
+            diffs, weights=weights[i_top] if weights is not None else None
+        )
+        return lambda x: diffs_avg + kde.score_samples(transf(x))
+    return logp_func
 
 
 def kl_norm(mean_0, cov_0, mean_1, cov_1):
@@ -91,6 +93,155 @@ def kl_norm(mean_0, cov_0, mean_1, cov_1):
         + np.trace(cov_1_inv @ cov_0)
         + (mean_1 - mean_0).T @ cov_1_inv @ (mean_1 - mean_0)
     )
+
+
+def kl_norm_sym(mean_0, cov_0, mean_1, cov_1):
+    return kl_norm(mean_0, cov_0, mean_1, cov_1) + kl_norm(mean_1, cov_1, mean_0, cov_0)
+
+
+def kl(sample_P, logp_P_sample_P, logp_Q_sample_P, weights_P=None, nstd=None):
+    """
+    Computes a Monte Carlo estimate of the KL divergence ``KL(P|Q)`` given a sample from
+    ``P``, and its log-posterior values under ``P`` and ``Q``.
+    """
+    n = len(sample_P)
+    if len(logp_P_sample_P) != n or len(logp_Q_sample_P) != n:
+        raise TypeError(
+            "The lenght of the samples and logp vectors must be equal. "
+            f"Got respectively {n}, {len(logp_P_sample_P)}, {len(logp_Q_sample_P)}."
+        )
+    if weights_P is not None and len(weights_P) != n:
+        raise TypeError(
+            "The lenght of the weight vectors must be the same as that of the sample. "
+            f"Got respectively {len(weights_P)}, {n}."
+        )
+    # Numerical stability: restrict to highest sigma, computed with Gaussian dynamic range
+    # This avoids divergences due to very small logp_Q values *at the tails of P*, which
+    # should not matter for inference.
+    # If 'auto', increase nsigma until it stabilises, starting relatively high (5)
+    if nstd == "auto":
+        kl_old = 1e-30
+        for i, nstd_i in enumerate(range(5, 100)):
+            kl_new = kl(
+                sample_P,
+                logp_P_sample_P,
+                logp_Q_sample_P,
+                weights_P=weights_P,
+                nstd=nstd_i,
+            )
+            # Stop at equality or divergence (except 1st iteration)
+            if np.isclose(kl_new, kl_old) or (
+                i != 0 and abs(np.log(abs(kl_new) / abs(kl_old))) > 1
+            ):
+                return kl_new
+        return kl_new  # will amost for sure not get here.
+    if nstd is not None:  # 'auto' already discarded
+        d = sample_P.shape[1]
+        max_diff = nstd_of_1d_nstd(nstd, d)
+        i_high_P = np.argwhere(max(logp_P_sample_P) - logp_P_sample_P < max_diff)
+        sample_P = sample_P[i_high_P]
+        weights_P = weights_P[i_high_P] if weights_P is not None else None
+        logp_P_sample_P = logp_P_sample_P[i_high_P]
+        logp_Q_sample_P = logp_Q_sample_P[i_high_P]
+    if weights_P is None:
+        return np.sum(logp_P_sample_P - logp_Q_sample_P) / n
+    # Numerical stability: make the highest weight 1
+    weights_P = weights_P / max(weights_P)
+    return np.sum(weights_P * (logp_P_sample_P - logp_Q_sample_P)) / np.sum(weights_P)
+
+
+def kl_sym(
+    sample_1,
+    sample_2,
+    weights_1=None,
+    weights_2=None,
+    logp_func_1=None,
+    logp_func_2=None,
+    logp_1_sample_1=None,
+    logp_2_sample_2=None,
+    nstd="auto",
+):
+    """
+    Computes a Monte Carlo estimate of the symmetric (Jeffreys) KL divergence between two
+    samples: ``KL(P|Q) + KL(Q|P)``.
+
+    Only the samples are required, with optional weights.
+
+    For each component, if the ``logp`` function is not provided, it will estimate it from
+    a KDE reconstructed from the corresponding sample.
+
+    If the log-posterior values of the samples under their own distributions are known
+    (``logp_X_sampleX``), they can be passed to save some computational costs.
+    """
+    if logp_1_sample_1 is None:
+        logp_1_sample_1 = logp_func_1(sample_1)
+    if logp_2_sample_2 is None:
+        logp_2_sample_2 = logp_func_2(sample_2)
+    logp_func_1 = kde_logp_if_needed(
+        sample_1, logp_1_sample_1, weights=weights_1, logp_func=logp_func_1
+    )
+    logp_func_2 = kde_logp_if_needed(
+        sample_2, logp_2_sample_2, weights=weights_2, logp_func=logp_func_2
+    )
+    one_to_two = kl(
+        sample_1, logp_1_sample_1, logp_func_2(sample_1), weights_P=weights_1, nstd=nstd
+    )
+    two_to_one = kl(
+        sample_2, logp_2_sample_2, logp_func_1(sample_2), weights_P=weights_2, nstd=nstd
+    )
+    return one_to_two + two_to_one
+
+
+def js(
+    sample_1,
+    sample_2,
+    weights_1=None,
+    weights_2=None,
+    logp_func_1=None,
+    logp_func_2=None,
+    logp_1_sample_1=None,
+    logp_2_sample_2=None,
+    nstd="auto",
+):
+    """
+    Computes a Monte Carlo estimate of the Jensen-Shannon divergence (distance squared)
+    between two samples.
+
+    Only the samples are required, with optional weights.
+
+    For each component, if the ``logp`` function is not provided, it will estimate it from
+    a KDE reconstructed from the corresponding sample.
+
+    If the log-posterior values of the samples under their own distributions are known
+    (``logp_X_sampleX``), they can be passed to save some computational costs.
+    """
+    if logp_1_sample_1 is None:
+        logp_1_sample_1 = logp_func_1(sample_1)
+    if logp_2_sample_2 is None:
+        logp_2_sample_2 = logp_func_2(sample_2)
+    logp_func_1 = kde_logp_if_needed(
+        sample_1, logp_1_sample_1, weights=weights_1, logp_func=logp_func_1
+    )
+    logp_func_2 = kde_logp_if_needed(
+        sample_2, logp_2_sample_2, weights=weights_2, logp_func=logp_func_2
+    )
+    # Prepare joint distribution -- give both samples the sampe weight
+    logp_func_mix = lambda x: 0.5 * (logp_func_1(x) + logp_func_2(x))
+    one_to_mix = kl(
+        sample_1,
+        logp_1_sample_1,
+        logp_func_mix(sample_1),
+        weights_P=weights_1,
+        nstd=nstd,
+    )
+    two_to_mix = kl(
+        sample_2,
+        logp_2_sample_2,
+        logp_func_mix(sample_2),
+        weights_P=weights_2,
+        nstd=nstd,
+    )
+    return 0.5 * (one_to_mix + two_to_mix)
 
 
 # Originally from extrapops (SOBBH population synthesis)

@@ -8,7 +8,14 @@ from .io import create_path, dump_result
 from .mpi import get_num_threads, is_main_process, mpi_comm, mpi_size
 from .pdf import PDF
 from .plots import plot_triangle
-from .utils import ColNames, generic_param_names, kl, kl_norm_sym, kl_sym
+from .utils import (
+    ColNames,
+    generic_param_names,
+    js,
+    kde_logp_if_needed,
+    kl_norm_sym,
+    kl_sym,
+)
 
 
 def run(
@@ -146,65 +153,84 @@ def run(
     mpi_comm.barrier()
     # Do our side of the tests and plots
     if is_main_process:
-        print("Computing results...")
+        print("Computing metrics...")
         results.update(sampler_results)
-        # Symmetric (Jeffrey's) KL against the true pdf. Only if we have a sampler from the
-        # true posterior AND a surrogate model (otherwise it is tiny and meaningless).
+        weights = sample[ColNames.weight].to_numpy()
         sample_orig = results["samples"]
         if sample_ref is not None and sample_ref.shape[1] == pdf.dim + 1:
             weights_ref = sample_ref[:, 0]
             sample_ref = sample_ref[:, 1:]
         else:
             weights_ref = None
-        logp_func = results.pop("logp_func", None)
-        if sample_ref is not None and logp_func is not None:
-            sampled_params = [
-                p.name for p in sample_orig.getParamNames().names if not p.isDerived
-            ]
-            sample = np.array([sample_orig[p] for p in sampled_params]).T
-            weights = sample_orig.weights
-            # This is a log-posterior sample, not a log-likelihood,
-            sample_logp = sample_orig["logpost"]
-            # so the reference pdf must be the logposterior too!
-            sample_logp_ref = pdf.logpost(sample)
-            sample_ref_logp_ref = pdf.logpost(sample_ref)
-            sample_ref_logp = logp_func(sample_ref)
-            # Let's put a bottom to the logp function to avoid infinite terms in KL sum:
-            # use the smallest still-finite value
-            sample_ref_logp[~np.isfinite(sample_ref_logp)] = np.min(
-                sample_ref_logp[np.isfinite(sample_ref_logp)]
-            )
-            results["kl_left"] = float(
-                kl(
-                    sample_ref,
-                    sample_ref_logp_ref,
-                    sample_ref_logp,
-                    weights_P=weights_ref,
-                )
-            )
-            results["kl_right"] = float(
-                kl(sample, sample_logp, sample_logp_ref, weights_P=weights)
-            )
-            results["kl"] = float(
-                kl_sym(
-                    sample,
-                    sample_logp,
-                    sample_logp_ref,
-                    sample_ref,
-                    sample_ref_logp_ref,
-                    sample_ref_logp,
-                    weights_1=weights,
-                    weights_2=weights_ref,
-                )
-            )
-            results["kl_norm"] = float(
+        if sample_ref is not None:
+            # Symmetric (Jeffrey's) KL against the true pdf; Gaussian approx.
+            results["kl_norm_sym"] = float(
                 kl_norm_sym(
-                    np.average(sample, weights=weights, axis=0),
-                    np.cov(sample.T, aweights=weights),
+                    np.average(sample_X, weights=weights, axis=0),
+                    np.cov(sample_X.T, aweights=weights),
                     np.average(sample_ref, axis=0, weights=weights_ref),
                     np.cov(sample_ref.T, aweights=weights_ref),
                 )
             )
+            # Precompute common functions and quantities
+            logp_func_ref = lambda x: pdf.logp(x) + pdf.logprior_density
+            logp_func_sample_kde = kde_logp_if_needed(
+                sample_X, logp_func_ref(sample_X), weights=weights
+            )
+            logp_ref_ref = logp_func_ref(sample_ref)
+            logp_mc_mc = logp_func_sample_kde(sample_X)
+            # Symmetric (Jeffrey's) KL against the true pdf, MC-sum with KDE approx
+            results["kl_sym"] = float(
+                kl_sym(
+                    sample_ref,
+                    sample_X,
+                    weights_1=weights_ref,
+                    weights_2=weights,
+                    logp_func_1=logp_func_ref,
+                    logp_func_2=logp_func_sample_kde,
+                    logp_1_sample_1=logp_ref_ref,
+                    logp_2_sample_2=logp_mc_mc,
+                )
+            )
+            # Jensen-Shannon divergence, MC-sum with KDE approx
+            results["js"] = float(
+                js(
+                    sample_ref,
+                    sample_X,
+                    weights_1=weights_ref,
+                    weights_2=weights,
+                    logp_func_1=logp_func_ref,
+                    logp_func_2=logp_func_sample_kde,
+                    logp_1_sample_1=logp_ref_ref,
+                    logp_2_sample_2=logp_mc_mc,
+                )
+            )
+            # If the sampler has a surrogate log-posterior, try using it instead of KDE.
+            logp_func_surr = results.pop("logp_func", None)
+            if logp_func_surr is not None:
+                logp_func_surr_clipped = lambda x: np.clip(logp_func_surr(x), -1e30, None)
+                results["kl_surr"] = float(
+                    kl_sym(
+                        sample_ref,
+                        sample_X,
+                        weights_1=weights_ref,
+                        weights_2=weights,
+                        logp_func_1=logp_func_ref,
+                        logp_func_2=logp_func_surr_clipped,
+                        logp_1_sample_1=logp_ref_ref,
+                    )
+                )
+                results["js_surr"] = float(
+                    js(
+                        sample_ref,
+                        sample_X,
+                        weights_1=weights_ref,
+                        weights_2=weights,
+                        logp_func_1=logp_func_ref,
+                        logp_func_2=logp_func_surr_clipped,
+                        logp_1_sample_1=logp_ref_ref,
+                    )
+                )
         # Evidence
         results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
         # Save results object and samples
