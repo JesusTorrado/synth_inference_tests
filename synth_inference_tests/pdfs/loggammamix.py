@@ -8,7 +8,7 @@ Difficulty: multimodality and heavy tails.
 """
 
 import numpy as np
-from scipy.stats import norm, loggamma  # type: ignore
+from scipy.stats import loggamma, norm  # type: ignore
 
 from ..pdf import PDF
 
@@ -27,6 +27,7 @@ class LogGammaMix(PDF):
     def __init__(self, dim):
         super().__init__(dim)
         self.bounds = np.array(dim * [[-5, 5]])
+        self.ref_bounds = np.array(dim * [[0, 1]])
         # NB: mind the 0-based indexing of dimensionality when comparing to sources
         self.loggamma_0_1 = loggamma(c=1, loc=1 / 3, scale=1 / 30)
         self.loggamma_0_2 = loggamma(c=1, loc=2 / 3, scale=1 / 30)
