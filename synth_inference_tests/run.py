@@ -139,6 +139,9 @@ def run(
         print(f"Error processing output: {excpt}")
         processing_success = False  # only MPI rank 0 ever gets here
     processing_success = mpi_comm.bcast(processing_success)
+    if not processing_success:
+        return results if is_main_process else None
+    mpi_comm.barrier()
     paramnames = generic_param_names(pdf.dim, based_0=False)
     if is_main_process:
         # (Re)create derived parameters for log-posterior, log-likelihood, log-prior
@@ -148,9 +151,6 @@ def run(
         sample[ColNames.logpost] = loglikes + pdf.logprior_density
         sample[ColNames.loglike] = loglikes
         sample[ColNames.logprior] = pdf.logprior_density
-    if not processing_success:
-        return results if is_main_process else None
-    mpi_comm.barrier()
     # Do our side of the tests and plots
     if is_main_process:
         results.update(sampler_results)
@@ -211,7 +211,7 @@ def run(
             logp_func_surr = results.pop("logp_func", None)
             if logp_func_surr is not None:
                 logp_func_surr_clipped = lambda x: np.clip(logp_func_surr(x), -1e30, None)
-                results["kl_surr"] = float(
+                results["kl_sym_surr"] = float(
                     kl_sym(
                         sample_ref,
                         sample_X,
