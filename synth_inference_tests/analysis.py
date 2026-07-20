@@ -6,7 +6,27 @@ import numpy as np
 import pandas as pd  # type: ignore
 import yaml  # type: ignore
 
+from .plots import metric_boxplot
+
+# Ignore unconstruct-able left-over tags (e.g. surrogate log-posterior)
+yaml.add_multi_constructor("tag:", lambda *x, **kw: None, Loader=yaml.SafeLoader)
+
 results_filename = "result.yaml"
+col_parallel = "(MPI, thr)"
+
+# Operations for columns
+# As list of tuples/lists; 2 elements if a metric has (avg,std) for weighted mean
+_average_cols = [
+    ["kl_norm_sym"],
+    ["kl_sym"],
+    ["kl_sym_surr"],
+    ["js"],
+    ["js_surr"],
+    ["logZ", "logZstd"],
+    ["time_overhead"],
+    ["n_truth"],
+]
+_max_cols = ["n_truth_max_process"]
 
 
 def create_table(output_folder, aggregate=False):
@@ -37,7 +57,6 @@ def create_table(output_folder, aggregate=False):
     columns = list(rows[0])
     table_dict = {col: [row.get(col, None) for row in rows] for col in columns}
     table = pd.DataFrame(table_dict)
-    col_parallel = "(MPI, thr)"
     table[col_parallel] = [
         (m, t) for _, (m, t) in table[["n_processes", "n_threads_per_process"]].iterrows()
     ]
@@ -85,32 +104,18 @@ def create_table(output_folder, aggregate=False):
 def aggregate_table(table, return_non_converged=False):
     """
     Aggregates rows corresponding to *converged* runs of the same pdf with the same
-    sampler.
+    sampler. Returns list of values for metric-related columns (and by default for any
+    other unknown column).
 
     If ``return_non_converged``, it returns a tuple ``(aggregated_table, errors_table)``,
     where the errors table is formatted as the input one.
     """
     # Work with a copy of the table, in case leftover runs returned
     table = table.copy(deep=True)
-    common_cols = ["pdf", "dim", "sampler"]
-    # Operations for columns (default operation: concatenate)
-    average_cols = [
-        ["kl_norm_sym"],
-        ["kl_sym"],
-        ["kl_sym_surr"],
-        ["js"],
-        ["js_surr"],
-        ["logZ", "logZstd"],
-        ["time_overhead"],
-        ["n_truth"],
-    ]
-    max_cols = ["n_truth_max_process"]
-    # ...
-    ignore_cols = list(chain.from_iterable(average_cols)) + max_cols
+    common_cols = ["pdf", "dim", "sampler", "logZ_truth"]
+    ignore_cols = [col_parallel, "end_state", "budget", "i"]
     # Prepare aggregated table, copying
-    agg_table_cols = [
-        col for col in table.columns if col != "i" and col not in ignore_cols
-    ]
+    agg_table_cols = [col for col in table.columns if col not in ignore_cols]
     agg_table = pd.DataFrame(
         {col: pd.Series([], dtype=table.dtypes[col]) for col in agg_table_cols}
     )
@@ -137,23 +142,11 @@ def aggregate_table(table, return_non_converged=False):
             col: (data.pop() if len(data) == 1 else list(data))
             for col, data in row_data.items()
         }
-        # Computed data
-        for cols in average_cols:
-            if len(cols) == 1:
-                row_data[cols[0] + "_agg_avg"] = np.average(rows[cols[0]])
-                row_data[cols[0] + "_agg_std"] = np.std(rows[cols[0]])
-            else:  # 2 cols: inv var weighting
-                row_data[cols[0] + "_agg_avg"] = np.sum(
-                    rows[cols[0]] / rows[cols[1]] ** 2
-                ) / np.sum(1 / rows[cols[1]] ** 2)
-                row_data[cols[1] + "_agg_std"] = np.sqrt(
-                    1 / np.sum(1 / rows[cols[1]] ** 2)
-                )
-        for col in max_cols:
-            row_data[col + "_agg_max"] = max(rows[col])
-        for new_col in row_data:
-            if new_col not in agg_table.columns:
-                agg_table[new_col] = []
+        # Columns not dealt-with so far: add list of values
+        for col in rows.columns:
+            if any(col in colset for colset in [common_cols, ignore_cols]):
+                continue
+            row_data[col] = list(rows[col])
         agg_table.loc[len(agg_table)] = row_data
     # Add aggregation counters
     agg_table.insert(len(common_cols), "N", N_comb)
@@ -166,3 +159,54 @@ def aggregate_table(table, return_non_converged=False):
             "(aggregated_table, non_converged_table)."
         )
     return agg_table
+
+
+def summarize_aggregated_table(agg_table):
+    """
+    Summarizes values for metrics in an aggregated table.
+    """
+    # Prepare summary table, copying
+    to_be_dropped_cols = list(chain.from_iterable(_average_cols)) + _max_cols
+    summ_table_cols = [col for col in agg_table.columns if col not in to_be_dropped_cols]
+    summ_table = pd.DataFrame(
+        {col: pd.Series([], dtype=agg_table.dtypes[col]) for col in summ_table_cols}
+    )
+    for _, row in agg_table.iterrows():
+        # Preprare the row data for the summary table
+        row_data = {col: row[col] for col in summ_table_cols}
+        # Computed data
+        for col in _average_cols:
+            if len(col) == 1:
+                row_data[col[0] + "_agg_avg"] = np.average(row[col[0]])
+                row_data[col[0] + "_agg_std"] = np.std(row[col[0]])
+            else:  # 2 cols: inv var weighting
+                row_data[col[0] + "_agg_avg"] = np.sum(
+                    row[col[0]] / np.power(row[col[1]], 2)
+                ) / np.sum(1 / np.power(row[col[1]], 2))
+                row_data[col[1] + "_agg_std"] = np.sqrt(
+                    1 / np.sum(1 / np.power(row[col[1]], 2))
+                )
+        for col in _max_cols:
+            row_data[col + "_agg_max"] = max(row[col])
+        for new_col in row_data:
+            if new_col not in summ_table.columns:
+                summ_table[new_col] = []
+        # Add the computed summaries (and the common cols) to the summary table
+        summ_table.loc[len(summ_table)] = row_data
+    return summ_table
+
+
+def plot_metrics(agg_table, output_folder, filename="metric", ext=".png"):
+    """
+    From an aggredated (nor summarized!) table, plots bloxplots summarizing of the
+    metrics.
+    """
+    for metric_cols in _average_cols:
+        col = metric_cols[0]
+        dists = [dist + str(dim) for dist, dim in zip(agg_table["pdf"], agg_table["dim"])]
+        data = dict(zip(dists, agg_table[col]))
+        ref_values = None
+        for suff in ["truth", "_truth"]:
+            if col + suff in agg_table.columns:
+                ref_values = dict(zip(dists, agg_table[col + suff]))
+        metric_boxplot(data, output_folder, name=col, ref_values=ref_values)

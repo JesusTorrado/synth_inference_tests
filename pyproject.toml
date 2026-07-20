@@ -2,7 +2,7 @@
 name = "synth_inference_tests"
 version = "0.5"
 dependencies = [
-    "numpy", "scipy", "pandas", "getdist"
+    "numpy", "scipy", "pandas", "scikit-learn", "getdist", "dill", "mpi4py", "matplotlib>=3.11"
 ]
 
 [tool.setuptools.package-data]
