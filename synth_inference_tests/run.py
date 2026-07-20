@@ -55,6 +55,7 @@ def run(
             "n_processes": mpi_size,
             "n_threads_per_process": get_num_threads(),
             "budget": budget,
+            "logZ_truth": float(pdf.logZ) if pdf.logZ is not None else None
         }
         if i is not None:
             results["i"] = i
@@ -233,8 +234,6 @@ def run(
                         logp_1_sample_1=logp_ref_ref,
                     )
                 )
-        # Evidence
-        results["logZ_truth"] = float(pdf.logZ) if pdf.logZ is not None else None
         # Save results object and samples
         dump_result(results, output_folder)
     mpi_comm.barrier()

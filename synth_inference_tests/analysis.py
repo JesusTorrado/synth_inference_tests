@@ -4,12 +4,9 @@ from itertools import chain
 
 import numpy as np
 import pandas as pd  # type: ignore
-import yaml  # type: ignore
 
+from .io import yaml_load
 from .plots import metric_boxplot
-
-# Ignore unconstruct-able left-over tags (e.g. surrogate log-posterior)
-yaml.add_multi_constructor("tag:", lambda *x, **kw: None, Loader=yaml.SafeLoader)
 
 results_filename = "result.yaml"
 col_parallel = "(MPI, thr)"
@@ -45,8 +42,7 @@ def create_table(output_folder, aggregate=False):
         if not os.path.isdir(absdir):
             continue
         try:
-            with open(os.path.join(absdir, results_filename), "r") as f:
-                rows.append(yaml.safe_load(f))
+            rows.append(yaml_load(os.path.join(absdir, results_filename)))
         except FileNotFoundError:
             warnings.warn(f"Unfinished run?: {dir}")
     if not rows:

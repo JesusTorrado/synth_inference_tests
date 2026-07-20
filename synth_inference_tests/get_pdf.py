@@ -6,10 +6,10 @@ import os
 from inspect import isclass
 from itertools import chain
 
-import yaml
 from numpy.random import default_rng
 
 import synth_inference_tests.pdfs as pdfs
+from synth_inference_tests.io import yaml_load
 
 # TODO: cached database
 
@@ -61,12 +61,9 @@ def get_pdfs(pdf_or_file_name):
     """
     if os.path.splitext(pdf_or_file_name)[1]:
         try:
-            with open(pdf_or_file_name, "r") as f:
-                pdfs_dict = yaml.safe_load(f)
+            pdfs_dict = yaml_load(pdf_or_file_name)
         except FileNotFoundError as excpt:
-            raise FileNotFoundError(
-                f"PDFs file {pdf_or_file_name} not found."
-            ) from excpt
+            raise FileNotFoundError(f"PDFs file {pdf_or_file_name} not found.") from excpt
         rng = default_rng(seed=pdfs_dict.pop("seed", None))
         pdfs = [
             [get_pdf(pdf_name, rng=rng) for _ in range(n or 1)]

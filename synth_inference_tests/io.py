@@ -6,6 +6,9 @@ import yaml  # type: ignore
 
 from .utils import ColNames, generic_param_names
 
+# Ignore unconstruct-able left-over tags (e.g. surrogate log-posterior)
+yaml.add_multi_constructor("tag:", lambda *x, **kw: None, Loader=yaml.SafeLoader)
+
 result_file = "result.yaml"
 _default_samples_file = "samples.npy"  # weights [parameters] logpost loglike logprior
 path_pdfs_data = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pdfs", "data")
@@ -41,3 +44,13 @@ def dump_result(result, output_folder):
         dump_samples(samples, output_folder)
     with open(os.path.join(output_folder, result_file), "w") as f:
         yaml.dump(result, f)
+
+
+def yaml_load(filename):
+    with open(filename, "r") as f:
+        return yaml.safe_load(f)
+
+
+def yaml_dump(data, filename):
+    with open(filename, "w") as f:
+        return yaml.dump(data, f)
