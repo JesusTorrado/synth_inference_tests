@@ -1,6 +1,7 @@
 import os
 import warnings
 from itertools import chain
+from typing import Mapping
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -194,15 +195,52 @@ def summarize_aggregated_table(agg_table):
 
 def plot_metrics(agg_table, output_folder, filename="metric", ext=".png"):
     """
-    From an aggredated (nor summarized!) table, plots bloxplots summarizing of the
-    metrics.
+    From an aggredated (nor summarized!) table (or dict of tables), plots bloxplots
+    summarizing of the metrics.
     """
+    if not isinstance(agg_table, Mapping):
+        agg_table = {None: agg_table}
+    # Gather all dists, merge and sort (Gaussian first)
+    dists = [
+        [dist + str(dim) for dist, dim in zip(table["pdf"], table["dim"])]
+        for table in agg_table.values()
+    ]
+    dists = list(set(chain(*dists)))
+    dists_bare = list(set(d.rstrip("0123456789") for d in dists))
+    dists_bare = (["Gaussian"] if "Gaussian" in dists_bare else []) + [
+        d for d in sorted(dists_bare) if d != "Gaussian"
+    ]
+    sorted_dists = []
+    for db in dists_bare:
+        # Make sure str("2") comes before str("10")
+        sorted_dists += sorted(
+            (d for d in dists if d.startswith(db)), key=lambda x: int(x[len(db) :])
+        )
     for metric_cols in _average_cols:
         col = metric_cols[0]
-        dists = [dist + str(dim) for dist, dim in zip(agg_table["pdf"], agg_table["dim"])]
-        data = dict(zip(dists, agg_table[col]))
+        data = {}
+        for k, table in agg_table.items():
+            data_k = list(table[["pdf", "dim", col]].to_dict(orient="list").values())
+            data_k = {pdf + str(dim): data for pdf, dim, data in zip(*data_k)}
+            if k is not None:
+                k = k.replace(os.path.sep, "")
+            data[k] = {dist: data_k.get(dist, []) for dist in sorted_dists}
+        # Ref values: look up in first table
         ref_values = None
+        lookup_table = list(agg_table.values())[0]
         for suff in ["truth", "_truth"]:
-            if col + suff in agg_table.columns:
-                ref_values = dict(zip(dists, agg_table[col + suff]))
-        metric_boxplot(data, output_folder, name=col, ref_values=ref_values)
+            if col + suff in lookup_table.columns:
+                dists_ref = list(
+                    lookup_table[["pdf", "dim", col + suff]]
+                    .to_dict(orient="list")
+                    .values()
+                )
+                ref_values = {pdf + str(dim): ref for pdf, dim, ref in zip(*dists_ref)}
+        filename = "metric"
+        if list(data) != [None]:
+            filename += "_" + "_".join(data)
+        if len(data) == 1:
+            data = list(data.values())[0]
+        metric_boxplot(
+            data, output_folder, name=col, ref_values=ref_values, filename=filename
+        )

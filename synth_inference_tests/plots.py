@@ -1,11 +1,24 @@
 import os
+import warnings
 from typing import Mapping, Sequence
 
 import matplotlib.pyplot as plt
-import numpy as np
 from numpy.linalg import LinAlgError
 
 from .utils import ColNames, pd_to_gd_samples
+
+tab10_colors = (
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+)
 
 
 def plot_triangle(sample, output_folder, filename="triangle.png", pdf=None, filled=True):
@@ -18,18 +31,6 @@ def plot_triangle(sample, output_folder, filename="triangle.png", pdf=None, fill
 def plot_triangle_getdist(
     sample, output_folder, filename="triangle.png", pdf=None, filled=True
 ):
-    tab10_colors = (
-        "#1f77b4",
-        "#ff7f0e",
-        "#2ca02c",
-        "#d62728",
-        "#9467bd",
-        "#8c564b",
-        "#e377c2",
-        "#7f7f7f",
-        "#bcbd22",
-        "#17becf",
-    )
     from getdist import plots as gdplt  # type: ignore
     from getdist.mcsamples import MCSamples  # type: ignore
 
@@ -84,9 +85,12 @@ def metric_boxplot(
 
     Parameters
     ----------
-    values: dict, list of dicts
+    values: dict
         Dict ``{"d_1": [m_1, m_2, ...], "d_2": [m_1, m_2,...]}`` where ``d_i`` are the
         different distributions or experiments, and ``m_i`` are the metric values.
+        For several batches to be comapred pass a dict with the batch labels as keys, and
+        a dict like the above as values; in that case, all batches are expected to have
+        the same distributions, even if given an empty-list value.
 
     ref_values: dict
         Dict ``{"d_1": "r_1", "d_2": r_2}`` where ``d_i`` are the different distributions
@@ -97,19 +101,44 @@ def metric_boxplot(
     """
     fig = plt.figure()
     ax = fig.gca()
-    ax.boxplot(list(values.values()))
-    ax.set_xticklabels(list(values))
+    # Normalize data into a dict of dicts
+    if not isinstance(values[list(values)[0]], Mapping):
+        values = {None: values}
+    # Set tick labels using the first data set (all assumed having the same categories)
+    dists_list = list(values[list(values)[0]])
+    # Widths and positions of tick labels
+    xskip = 0.075
+    width = (0.5 - xskip * (len(values) - 1)) / len(values)
+    i_ticks = int((len(values) - 0.5) / 2)
+    for i, (batch, values_i) in enumerate(values.items()):
+        kwargs = {
+            "positions": [_ + (width + xskip) * i for _ in range(len(dists_list))],
+            "widths": width,
+            "tick_labels": dists_list,
+            "manage_ticks": i == i_ticks,
+            "label": batch,
+            # Style
+            "patch_artist": True,
+            "showmeans": False,
+            "medianprops": {"color": "k", "linewidth": 0.5},
+            "boxprops": {"facecolor": tab10_colors[i], "edgecolor": "k"},
+            "flierprops": {"marker": "x", "markersize": 4},
+        }
+        ax.boxplot(list(values_i.values()), **kwargs)
+        # Add reference values
+        refs = []
+        for dist in dists_list:
+            refs.append((ref_values or {}).get(dist))
+        ax.scatter(kwargs["positions"], refs, c="r", marker="*")
     ax.tick_params("x", rotation=45, rotation_mode="xtick")
-    for i, dist in enumerate(values):
-        ref = (ref_values or {}).get(dist)
-        if ref is None or np.isnan(ref):
-            continue
-        ax.scatter(i + 1, ref, c="r", marker="*")
     if name is None or not name.startswith("log"):
         ax.set_yscale("log")
     if name is not None:
         ax.set_ylabel("$" + name + "$")
         filename += "_" + name
     filename += "." + ext.lstrip(".")
+    with warnings.catch_warnings():  # warning if there is no label
+        warnings.simplefilter("ignore")
+        fig.legend()
     # bbox_inches='tight' guarantees that the tick labels are not cropped.
     fig.savefig(os.path.join(output_folder, filename), bbox_inches="tight")
