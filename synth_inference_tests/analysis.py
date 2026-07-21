@@ -131,6 +131,8 @@ def aggregate_table(table, return_non_converged=False):
                 table[common_cols[1]] == comb[1]
             ][table[common_cols[2]] == comb[2]][table["end_state"] == "c"].index.to_list()
         rows = table.loc[i_comb].copy()
+        if not len(rows):
+            continue
         table.drop(i_comb, inplace=True)
         N_comb.append(len(rows))
         # Common data to be added: uniquify and merge, or concatenate if >1 different
@@ -186,6 +188,8 @@ def summarize_aggregated_table(agg_table):
                     1 / np.sum(1 / np.power(row[col[1]], 2))
                 )
         for col in _max_cols:
+            if len(row[col]) == 0:
+                continue
             row_data[col + "_agg_max"] = max(row[col])
         for new_col in row_data:
             if new_col not in summ_table.columns:
