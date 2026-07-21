@@ -173,6 +173,8 @@ def summarize_aggregated_table(agg_table):
         row_data = {col: row[col] for col in summ_table_cols}
         # Computed data
         for col in _average_cols:
+            if col[0] not in row:
+                continue
             if len(col) == 1:
                 row_data[col[0] + "_agg_avg"] = np.average(row[col[0]])
                 row_data[col[0] + "_agg_std"] = np.std(row[col[0]])
@@ -220,11 +222,15 @@ def plot_metrics(agg_table, output_folder, filename="metric", ext=".png"):
         col = metric_cols[0]
         data = {}
         for k, table in agg_table.items():
+            if col not in table.columns:
+                continue
             data_k = list(table[["pdf", "dim", col]].to_dict(orient="list").values())
             data_k = {pdf + str(dim): data for pdf, dim, data in zip(*data_k)}
             if k is not None:
                 k = k.replace(os.path.sep, "")
             data[k] = {dist: data_k.get(dist, []) for dist in sorted_dists}
+        if not data:
+            continue
         # Ref values: look up in first table
         ref_values = None
         lookup_table = list(agg_table.values())[0]
