@@ -40,9 +40,10 @@ if __name__ == "__main__":
     # Prepare sampler
     sampler_name = sys.argv[1].lower()
     run_func, process_output_func = get_wrapper(sampler_name)
-    sampler_kwargs = sys.argv[3] if len(sys.argv) >= 4 else None
-    if sampler_kwargs is not None:
-        with open(sampler_kwargs, "r") as f:
+    sampler_kwargs = None
+    sampler_kwargs_file = sys.argv[3] if len(sys.argv) >= 4 else None
+    if sampler_kwargs_file is not None:
+        with open(sampler_kwargs_file, "r") as f:
             sampler_kwargs = yaml.safe_load(f)
     # Build PDF (or list of them)
     pdfs = get_pdfs(sys.argv[2])
@@ -57,7 +58,7 @@ if __name__ == "__main__":
             )
             print("\n" + "*" * len(msg) + "\n" + msg + "\n" + "*" * len(msg) + "\n")
         output_folder = os.path.join(
-            "output_" + sampler_name,
+            "output_" + sampler_name + (sampler_kwargs_file or ""),
             pdf.NameDim + "_" + str(n_realisations[pdf.NameDim]),
         )
         if is_main_process:
